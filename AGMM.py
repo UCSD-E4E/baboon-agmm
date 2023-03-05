@@ -1,8 +1,16 @@
 import numpy as np
-from scipy.stats import norm
+import cython
 import cv2
 
+@cython.cclass
 class AGMM:
+    nums_gaussians: cython.int
+    alpha: cython.float
+    T_sigma: cython.float
+    Sigma_0: cython.long
+    w_0: cython.float
+
+
     def __init__(self, num_gaussians=3, alpha=0.01, T_sigma=2.5, Sigma_0=1e2, w_0=0.01):
         self.num_gaussians = num_gaussians
         self.alpha = alpha
@@ -14,13 +22,8 @@ class AGMM:
         self.Mu = np.zeros((num_gaussians, 3))
         self.Sigma = np.zeros((num_gaussians, 3))
         self.W = np.zeros(num_gaussians)
-        self.frame_count = 0
 
-
-    def apply(self, frame):
-        # Increment frame count
-        self.frame_count += 1
-        
+    def apply(self, frame):        
         # Convert frame to float
         frame = frame.astype(float)
 
@@ -28,8 +31,14 @@ class AGMM:
         mask = np.zeros(frame.shape[:2], dtype=np.uint8)
 
         # Loop over all pixels
-        for i in range(frame.shape[0]):
-            for j in range(frame.shape[1]):
+        i: cython.int
+        j: cython.int
+        w: cython.int
+        h: cython.int
+        w = frame.shape[0]
+        h = frame.shape[1]
+        for i in range(w):
+            for j in range(h):
                 pixel = frame[i, j, :]
 
                 # Check if pixel matches a model
@@ -81,7 +90,7 @@ while cap.isOpened():
     cv2.imshow('background', background)
 
     # check for user input to exit
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(100) & 0xFF == ord('q'):
         break
 
 cap.release()
