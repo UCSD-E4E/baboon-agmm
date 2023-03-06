@@ -1,79 +1,98 @@
 import numpy as np
 import cython
 import cv2
+from scipy.stats import multivariate_normal
 
 @cython.cclass
-class AGMM:
-    nums_gaussians: cython.int
+class AGMM():
+    num_gaussians: cython.int
     alpha: cython.float
-    T_sigma: cython.float
-    Sigma_0: cython.long
-    w_0: cython.float
+    beta: cython.float
+    height: cython.int
+    width: cython.int
 
+    def __init__(self, width=640, height=360):
+        self.num_gaussians = 3
+        self.alpha = 0.01
+        self.beta = 0.6
+        self.height = height
+        self.width = width
 
-    def __init__(self, num_gaussians=3, alpha=0.01, T_sigma=2.5, Sigma_0=1e2, w_0=0.01):
-        self.num_gaussians = num_gaussians
-        self.alpha = alpha
-        self.T_sigma = T_sigma
-        self.Sigma_0 = Sigma_0
-        self.w_0 = w_0
-        
         # Initialize variables
-        self.Mu = np.zeros((num_gaussians, 3))
-        self.Sigma = np.zeros((num_gaussians, 3))
-        self.W = np.zeros(num_gaussians)
-
-    def apply(self, frame):        
-        # Convert frame to float
-        frame = frame.astype(float)
-
-        # Create binary mask
-        mask = np.zeros(frame.shape[:2], dtype=np.uint8)
-
-        # Loop over all pixels
+        self.Mu = np.zeros((self.height, self.width, self.num_gaussians, 3))
+        self.Sigma = np.zeros((self.height, self.width, self.num_gaussians))
+        self.W = np.zeros((self.height, self.width, self.num_gaussians))
         i: cython.int
         j: cython.int
-        w: cython.int
-        h: cython.int
-        w = frame.shape[0]
-        h = frame.shape[1]
-        for i in range(w):
-            for j in range(h):
-                pixel = frame[i, j, :]
-
-                # Check if pixel matches a model
-                match = False
-                for n in range(self.num_gaussians):
-                    if self.W[n] > 0:
-                        if abs(pixel - self.Mu[n]).sum() <= self.T_sigma * np.sqrt(self.Sigma[n]).all():
-                            match = True
-                            self.W[n] = (1 - self.alpha) * self.W[n] + self.alpha
-                            self.Mu[n] = (1 - self.alpha) * self.Mu[n] + self.alpha * pixel
-                            self.Sigma[n] = (1 - self.alpha) * self.Sigma[n] + self.alpha * (pixel - self.Mu[n])**2
-                            break
-                
-                # If no match is found, replace the weakest model
-                if not match:
-                    k = np.argmin(self.W)
-                    self.W[k] = self.w_0
-                    self.Mu[k] = pixel
-                    self.Sigma[k] = self.Sigma_0
-                
-                # Normalize weights
-                self.W /= np.sum(self.W)
-
-                # Create mask
-                if np.max(self.W) >= 0.5:
-                    mask[i, j] = 255
-
-        # Return binary mask
-        return mask
+        for i in range(self.height):
+            for j in range(self.width):
+                self.Mu[i,j] = np.array([[122, 122, 122]] * self.num_gaussians)
+                self.Sigma[i,j] = [36.0] * self.num_gaussians
+                self.W[i,j] = [1.0/self.num_gaussians] * self.num_gaussians
         
 
+    def update(self):
+        mask = np.zeros((self.height, self.width), dtype=int)
+        i: cython.int
+        j: cython.int
+        k: cython.int
+        l: cython.int
+        probability: cython.float
+        for i in range(self.height):
+            for j in range (self.width):
+                mask[i, j] = -1
+                ratio = []
+                for k in range(self.num_gaussians):
+                    ratio.append(self.W[i, j, k]/np.sqrt(self.Sigma[i, j, k]))
+                indices = np.array(np.argsort(ratio[: : -1]))
+                self.Mu[i,j] = self.Mu[i,j][indices]
+                self.Sigma[i,j] = self.Sigma[i,j][indices]
+                probability = 0
+                for l in range(self.num_gaussians):
+                    probability += self.W[i,j,l]
+                    if probability >= self.beta and l < self.num_gaussians - 1:
+                        mask[i, j] = l
+                        break
 
-# Usage example
+                if mask[i, j] == -1:
+                    mask[i, j] = self.num_gaussians-2
+        return mask
+    
+    def apply(self, frame, mask):
+        foreground = np.zeros((self.height, self.width))
+        i: cython.int
+        j: cython.int
+        k: cython.int
+        match: cython.float
+        for i in range(self.height):
+            for j in range(self.width):
+                pixel = frame[i, j]
+                match = -1
+                for k in range(self.num_gaussians):
+                    covarianceInv = np.linalg.inv(self.Sigma[i,j,k]*np.eye(3))
+                    pixel_Mu = pixel - self.Mu[i,j,k]
+                    dist = np.dot(pixel_Mu.T, np.dot(covarianceInv, pixel_Mu))
+                    if dist < 6.25*self.Sigma[i,j,k]:
+                        match = k
+                        break
+                if match != -1:
+                    self.W[i,j] = (1.0 - self.alpha)*self.W[i,j]
+                    self.W[i,j,match] += self.alpha
+                    rho = self.alpha * multivariate_normal.pdf(pixel, self.Mu[i,j,match], np.linalg.inv(covarianceInv))
+                    self.Sigma[match] = (1.0 - rho) * self.Sigma[i,j,match] + rho * np.dot((pixel - self.Mu[i,j,match]).T, (pixel - self.Mu[i,j,match]))
+                    self.Mu[i,j,match] = (1.0 - rho) * self.Mu[i,j,match] + rho * pixel
+
+                    if match > mask[i,j]:
+                        foreground[i,j] = 250
+                else:
+                    self.Mu[i,j,-1] = pixel
+                    foreground[i,j] = 250
+        return foreground
+                    
+
 cap = cv2.VideoCapture('videos/car-2165.mp4')
 agmm = AGMM()
+framecount = 0
 
 while cap.isOpened():
     # read a frame from the video
@@ -81,9 +100,11 @@ while cap.isOpened():
     if not ret:
         break
 
+    framecount += 1 
+
     # apply AGMM background subtraction to the frame
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    background = agmm.apply(frame)
+    model = agmm.update()
+    background = agmm.apply(frame, model)
 
     # display the foreground mask
     cv2.imshow('Frame', frame)
