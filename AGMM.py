@@ -14,7 +14,7 @@ class AGMM():
     def __init__(self, width=640, height=360):
         self.num_gaussians = 3
         self.alpha = 0.01
-        self.beta = 0.6
+        self.beta = 0.8
         self.height = height
         self.width = width
 
@@ -109,6 +109,9 @@ while cap.isOpened():
     # display the foreground mask
     cv2.imshow('Frame', frame)
     cv2.imshow('background', background)
+
+    if (framecount % 10 == 1):
+        cv2.imwrite("render{0}.png".format(framecount), background)
 
     # check for user input to exit
     if cv2.waitKey(100) & 0xFF == ord('q'):
