@@ -19,17 +19,13 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-
-    namedWindow("Base Video", WINDOW_NORMAL); //create a window
-    namedWindow("Foreground", WINDOW_NORMAL); //create a window
-    namedWindow("Background", WINDOW_NORMAL); //create a window
-
-    Mat initFrame;
-    cap.read(initFrame);
-    AGMM agmm = AGMM(initFrame);
+    Mat frame;
+    Mat background;
+    Mat foreground;
+    cap.read(frame);
+    AGMM agmm = AGMM(frame);
 
     while (true) {
-        Mat frame;
         bool bSuccess = cap.read(frame); // read a new frame from video 
 
         //Breaking the while loop at the end of the video
@@ -38,9 +34,7 @@ int main(int argc, char** argv) {
             break;
         }
 
-        pair<Mat,Mat> result = agmm.updateBackground(frame);
-        Mat foreground = result.first;
-        Mat background = result.second;
+        tie(background,foreground) = agmm.updateBackground(frame);
 
         //show the frame in the created window
         imshow("Base Video", frame);
@@ -52,7 +46,7 @@ int main(int argc, char** argv) {
         //If the 'Esc' key is pressed, break the while loop.
         //If the any other key is pressed, continue the loop 
         //If any key is not pressed withing 10 ms, continue the loop 
-        if (waitKey(10) == 27) {
+        if (waitKey(50) == 27) {
             cout << "Esc key is pressed by user. Stopping the video" << endl;
             break;
         }
