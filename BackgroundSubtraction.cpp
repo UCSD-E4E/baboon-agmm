@@ -1,7 +1,5 @@
+#include "include/AGMM.h"
 #include <opencv2/opencv.hpp>
-#include <stdio.h>
-#include "AGMM.hpp"
-
 
 using namespace cv;
 using namespace std;
@@ -9,48 +7,45 @@ using namespace std;
 
 // play video frame by frame and show the result
 int main(int argc, char** argv) {
-    // open the video file for reading
-    VideoCapture cap(argv[1]);
-
-    // if not success, exit program
-    if (cap.isOpened() == false) {
-        cout << "Cannot open the video file" << endl;
-        cin.get(); //wait for any key press
+    if (argc != 2) {
+        cout << "Usage: BackgroundSubtraction <video_path>" << endl;
         return -1;
     }
 
-    Mat frame;
-    Mat background;
-    Mat foreground;
-    cap.read(frame);
-    AGMM agmm = AGMM(frame);
+    AGMM agmm(argv[1]);
+    agmm.initializeModel(10);
+
+    Mat frame, foregroundMask, foregroundMaskBGR, foregroundImage, combinedFrame, resizedFrame;
+
+    VideoWriter output;
+    bool isOutputVideoInitialized = false;
 
     while (true) {
-        bool bSuccess = cap.read(frame); // read a new frame from video 
+        tie(foregroundMask, foregroundImage, frame) = agmm.processNextFrame();
 
-        //Breaking the while loop at the end of the video
-        if (bSuccess == false) {
-            cout << "Found the end of the video" << endl;
+        if (frame.empty()) {
             break;
         }
 
-        tie(background,foreground) = agmm.updateBackground(frame);
+        cvtColor(foregroundMask, foregroundMaskBGR, COLOR_GRAY2BGR);
+        hconcat(frame, foregroundMaskBGR, combinedFrame);
+        resize(combinedFrame, resizedFrame, Size(), 0.5, 0.5, INTER_LINEAR);
+    
+        if (!isOutputVideoInitialized) {
+            output = VideoWriter("output.avi", VideoWriter::fourcc('X', '2', '6', '4'), 25, resizedFrame.size());
+            isOutputVideoInitialized = true;
+        }
 
-        //show the frame in the created window
-        imshow("Base Video", frame);
-        imshow("Foreground", foreground);
-        imshow("Background", background);
+        output.write(resizedFrame);
 
+        imshow("Frame", resizedFrame);
 
-        //wait for for 10 ms until any key is pressed.  
-        //If the 'Esc' key is pressed, break the while loop.
-        //If the any other key is pressed, continue the loop 
-        //If any key is not pressed withing 10 ms, continue the loop 
-        if (waitKey(50) == 27) {
-            cout << "Esc key is pressed by user. Stopping the video" << endl;
+        if (waitKey(30) == 27) {
             break;
         }
     }
 
+    agmm.~AGMM();
+    output.release();
     return 0;
 }
