@@ -14,7 +14,7 @@ Mixture::Mixture(double numberOfGaussians, double alpha, double upperboundVarian
 }
 
 Mixture::~Mixture() {
-    gaussians.clear();
+    this->gaussians.clear();
 }
 
 vector<Vec3b> Mixture::randomSamplePixel(vector<Vec3b> pixels, int N) {
