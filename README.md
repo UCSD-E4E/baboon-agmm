@@ -22,5 +22,5 @@ cmake .
 make
 
 # Run the program
-./bin/BackgroundSubtraction <path to input file>
+./bin/BackgroundSubtraction <video_path> [-s|--step]
 ```
