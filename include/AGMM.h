@@ -15,19 +15,37 @@ using namespace std;
 */
 class AGMM {
     private:
-        double numberOfGaussians = 7;
-        double alpha = 0.001;
-        double backgroundRatio = 0.9;
-        double upperboundVariance = 64;
-        double lowerboundVariance = 16;
+        // Background maintenance parameters
+        double BM_numberOfGaussians = 7;
+        double BM_alpha = 0.001;
+        double BM_backgroundRatio = 0.9;
+        double BM_upperboundVariance = 36;
+        double BM_lowerboundVariance = 8;
+
+        // Shadow detection parameters
+        double SD_hueThreshold = 62; 
+        double SD_saturationThreshold = 93;
+        double SD_valueUpperbound = 1;
+        double SD_valueLowerbound = 0.6;
+
+
         
         VideoCapture cap;
+        Mat frame;
+        Mat background;
+        Mat mask;
+        Mat result;
 
         unsigned int rows;
         unsigned int cols;
         unsigned int numberOfPixels;
 
         vector<Mixture> mixtures;
+
+        void backgroundMaintenance();
+        void shadowDetection();
+
+        Mat maskCleaner(Mat mask);
 
     public:
         /**

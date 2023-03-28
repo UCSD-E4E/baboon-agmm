@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
         hconcat(frame, foregroundMaskBGR, combinedFrame);
         resize(combinedFrame, resizedFrame, Size(), 0.5, 0.5, INTER_LINEAR);
 
-        if (!isVideoWriterInitialized) {
+        if (!isVideoWriterInitialized && !step) {
             videoWriter.open("output.avi", VideoWriter::fourcc('x', '2', '6', '4'), 25, resizedFrame.size());
             isVideoWriterInitialized = true;
         }
