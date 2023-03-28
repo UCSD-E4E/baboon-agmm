@@ -39,6 +39,7 @@ void AGMM::initializeModel(int numberOfFrames) {
     Mat frame;
     for (int i = 0; i < numberOfFrames; i++) {
         this->cap >> frame;
+        GaussianBlur(frame, frame, Size(9, 9), 2, 2);
 
         // If no more frames, error and deconstruct AGMM
         if (frame.empty()) {
@@ -65,6 +66,7 @@ void AGMM::initializeModel(int numberOfFrames) {
 tuple<Mat, Mat, Mat> AGMM::processNextFrame() {
     Mat frame;
     this->cap >> frame;
+    GaussianBlur(frame, frame, Size(9, 9), 2, 2);
 
     // If no more frames, error and deconstruct AGMM
     if (frame.empty()) {
@@ -74,6 +76,7 @@ tuple<Mat, Mat, Mat> AGMM::processNextFrame() {
 
     Mat foregroundMask = Mat::zeros(this->rows, this->cols, CV_8U);
     Mat result = Mat::zeros(this->rows, this->cols, CV_8UC3);
+    
 
     // Update each mixture and create foreground mask
     for (unsigned int i = 0; i < this->rows; i++) {

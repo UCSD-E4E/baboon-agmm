@@ -16,10 +16,10 @@ using namespace std;
 class AGMM {
     private:
         double numberOfGaussians = 7;
-        double alpha = 0.003;
-        double backgroundRatio = 0.75;
-        double upperboundVariance = 36;
-        double lowerboundVariance = 8;
+        double alpha = 0.001;
+        double backgroundRatio = 0.9;
+        double upperboundVariance = 64;
+        double lowerboundVariance = 16;
         
         VideoCapture cap;
 
