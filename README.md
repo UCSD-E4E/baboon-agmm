@@ -8,8 +8,6 @@ Requires C++11 or higher and the following libraries:
 
 OpenCV (with contrib modules optional)
 
-## Usage
-
 ```bash
 # Clone the repository
 git clone https://github.com/UCSD-E4E/baboon-agmm/
@@ -20,7 +18,11 @@ cd baboon-agmm
 cmake .
 
 make
+```
 
+## Usage
+
+```bash
 # Run the program
 ./bin/BackgroundSubtraction <video_path> [-s|--step]
 ```
