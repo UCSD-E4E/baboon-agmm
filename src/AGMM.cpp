@@ -40,7 +40,7 @@ void AGMM::initializeModel(int numberOfFrames) {
     for (int i = 0; i < numberOfFrames; i++) {
         this->cap >> frame;
         this->background = frame;
-        GaussianBlur(frame, frame, Size(3, 3), 2, 2);
+        GaussianBlur(frame, frame, Size(9, 9), 2, 2);
 
         // If no more frames, error and deconstruct AGMM
         if (frame.empty()) {
@@ -78,6 +78,7 @@ tuple<Mat, Mat, Mat> AGMM::processNextFrame() {
     }
 
     this->backgroundMaintenance();
+    this->shadowDetection();
     bitwise_and(this->frame, this->frame, this->result, this->mask);
 
     return make_tuple(this->mask, this->result, this->frame);
@@ -87,7 +88,7 @@ tuple<Mat, Mat, Mat> AGMM::processNextFrame() {
 
 void AGMM::backgroundMaintenance() {
     Mat workingFrame;
-    GaussianBlur(this->frame, workingFrame, Size(3, 3), 2, 2);
+    GaussianBlur(this->frame, workingFrame, Size(9, 9), 2, 2);
     Mat foregroundMask = Mat::zeros(this->rows, this->cols, CV_8U);
     
 
@@ -104,7 +105,7 @@ void AGMM::backgroundMaintenance() {
         }
     }   
 
-    foregroundMask = this->maskCleaner(foregroundMask);
+    //foregroundMask = this->maskCleaner(foregroundMask);
 
     this->mask = foregroundMask;
 
@@ -149,22 +150,22 @@ void AGMM::shadowDetection() {
         }
     }
 
-    Mat element = getStructuringElement(MORPH_RECT, Size(2 * 2 + 1, 2 * 2 + 1), Point(2, 2));
-    Mat cannyFrame, grayFrame, roiMask;
+    // Mat element = getStructuringElement(MORPH_RECT, Size(2 * 2 + 1, 2 * 2 + 1), Point(2, 2));
+    // Mat cannyFrame, grayFrame, roiMask;
 
-    cvtColor(this->frame, grayFrame, COLOR_BGR2GRAY);
+    // cvtColor(this->frame, grayFrame, COLOR_BGR2GRAY);
 
-    Canny(grayFrame, cannyFrame, 50, 150);
-    threshold(cannyFrame, cannyFrame, 100, 255, THRESH_BINARY);
+    // Canny(grayFrame, cannyFrame, 50, 150);
+    // threshold(cannyFrame, cannyFrame, 100, 255, THRESH_BINARY);
 
-    morphologyEx(this->mask, roiMask, MORPH_DILATE, element);
-    morphologyEx(roiMask, roiMask, MORPH_DILATE, element);
+    // morphologyEx(this->mask, roiMask, MORPH_DILATE, element);
+    // morphologyEx(roiMask, roiMask, MORPH_DILATE, element);
 
-    bitwise_and(roiMask, cannyFrame, roiMask);
+    // bitwise_and(roiMask, cannyFrame, roiMask);
 
-    morphologyEx(roiMask, roiMask, MORPH_ERODE, element);
+    // morphologyEx(roiMask, roiMask, MORPH_ERODE, element);
 
-    shadowMask = shadowMask - roiMask;
+    // shadowMask = shadowMask - roiMask;
 
     this->mask = this->mask - shadowMask;
 
@@ -172,16 +173,28 @@ void AGMM::shadowDetection() {
 }
 
 Mat AGMM::maskCleaner(Mat mask) {
+    Mat element = getStructuringElement(MORPH_RECT, Size(2 * 2 + 1, 2 * 2 + 1), Point(2, 2));
+    morphologyEx(mask, mask, MORPH_CLOSE, element);
+    morphologyEx(mask, mask, MORPH_OPEN, element);
+
     Rect boundingBox;
     vector<vector<Point>> contours;
+    vector<int> contourIndices;
     vector<Vec4i> hierarchy;
 
     findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
     Mat cleanedMask = Mat::zeros(this->rows, this->cols, CV_8U);
 
     for (unsigned int i = 0; i < contours.size(); i++) {
-        drawContours(cleanedMask, contours, i, Scalar(255), FILLED, 8, hierarchy, 0);
+        boundingBox = boundingRect(contours[i]);
+        if (boundingBox.width > 4 && boundingBox.height > 4) {
+            contourIndices.push_back(i);
+        }
     }
+
+    for (unsigned int i = 0; i < contourIndices.size(); i++) {
+        drawContours(cleanedMask, contours, contourIndices[i], Scalar(255), FILLED, 8, hierarchy, 0);
+    }   
 
     return cleanedMask;
 }
