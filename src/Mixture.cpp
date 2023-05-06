@@ -1,17 +1,20 @@
 #include "../include/Mixture.h"
 #include "../include/Gaussian.h"
 #include <random>
+#include <limits>
 #include <opencv2/opencv.hpp>
 
 using namespace cv;
 using namespace std;
 
-Mixture::Mixture(double numberOfGaussians, double alpha, double upperboundVariance, double lowerboundVariance)
+Mixture::Mixture(double numberOfGaussians, double alpha, double beta_b, double beta_s, double beta_sf, double beta_mf)
 {
     this->numberOfGaussians = numberOfGaussians;
     this->alpha = alpha;
-    this->upperboundVariance = upperboundVariance;
-    this->lowerboundVariance = lowerboundVariance;
+    this->beta_b = beta_b;
+    this->beta_s = beta_s;
+    this->beta_sf = beta_sf;
+    this->beta_mf = beta_mf;
 }
 
 Mixture::~Mixture()
@@ -19,141 +22,143 @@ Mixture::~Mixture()
     this->gaussians.clear();
 }
 
-vector<Vec3b> Mixture::randomSamplePixel(vector<Vec3b> pixels, int N)
+void Mixture::initializeMixture(Vec3b pixel)
 {
-    random_device rd;
-    mt19937 eng(rd());
-    uniform_int_distribution<> generator(0, pixels.size() - 1);
-
-    vector<Vec3b> randomPixel;
-    vector<int> usedIndices;
-
-    // Generated N random indices
-    for (int i = 0; i < N; i++)
-    {
-        int index = generator(eng);
-
-        // Check if the index is already used
-        if (find(usedIndices.begin(), usedIndices.end(), index) != usedIndices.end())
-        {
-            i--;
-        }
-        else
-        {
-            usedIndices.push_back(index);
-            randomPixel.push_back(pixels[index]);
-        }
-    }
-
-    return randomPixel;
-}
-
-void Mixture::initializeMixture(vector<Vec3b> pixels)
-{
-    // Randomly sample N pixels from the image
-    vector<Vec3b> randomPixels = randomSamplePixel(pixels, this->numberOfGaussians);
-
     // Initialize the Gaussian components
     for (int i = 0; i < this->numberOfGaussians; i++)
     {
-        Vec3b pixel = randomPixels[i];
+        // Calculate the intensity of the pixel
+        double mean = (pixel[0] + pixel[1] + pixel[2]) / 3;
 
-        double meanB = static_cast<double>(pixel[0]);
-        double meanG = static_cast<double>(pixel[1]);
-        double meanR = static_cast<double>(pixel[2]);
-
-        Gaussian gaussian(randomPixels, meanB, meanG, meanR, this->lowerboundVariance, this->upperboundVariance, this->numberOfGaussians);
+        Gaussian gaussian(mean, 1 / this->numberOfGaussians);
         this->gaussians.push_back(gaussian);
     }
-
-    // Sort the Gaussian components by their weightRatio
-    sort(this->gaussians.begin(), this->gaussians.end(), [](Gaussian a, Gaussian b)
-         { return a.getWeightDistrRatio() > b.getWeightDistrRatio(); });
 }
 
-bool Mixture::updateMixture(Vec3b pixel, double threshold)
+void Mixture::updateMixture(Vec3b pixel)
 {
-    bool isBackgrond = false;
+    // Calculate the intensity of the pixel
+    double intensity = (pixel[0] + pixel[1] + pixel[2]) / 3;
+    double modelMatching[this->numberOfGaussians]{0};
+    double distances[this->numberOfGaussians]{numeric_limits<double>::infinity()};
 
-    // Find index of mixture until which we consider background disttributions. Asumming the order is in decnding order
-    int index = 0;
-    double sum = 0;
-    for (int i = 0; i < this->numberOfGaussians; i++)
+    for (int n = 0; n < this->numberOfGaussians; n++)
     {
-        if (sum < threshold)
+        if (abs(intensity - this->gaussians[n].getMean()) <= 2.5 * this->gaussians[n].getVariance())
         {
-            sum += this->gaussians[i].getWeightDistrRatio();
-            index++;
+            distances[n] = -this->gaussians[n].getWeight();
         }
-        else
+    }
+
+    // Find the minimum distance
+    double minDistance = numeric_limits<double>::infinity();
+    int minDistanceIndex = 0;
+    for (int n = 0; n < this->numberOfGaussians; n++)
+    {
+        if (distances[n] < minDistance)
         {
+            minDistance = distances[n];
+            minDistanceIndex = n;
+        }
+    }
+
+    if (distances[minDistanceIndex] != numeric_limits<double>::infinity())
+    {
+        modelMatching[minDistanceIndex] = 1;
+    }
+    else
+    {
+        minDistanceIndex = -1;
+    }
+
+    switch (this->O)
+    {
+    case 0:
+    {
+        this->eta = (1 - this->beta_b) * this->eta + .025 * this->beta_b;
+        break;
+    }
+    case 1:
+    {
+        double maxDistanceIndex = 0;
+        for (int n = 0; n < this->numberOfGaussians; n++)
+        {
+            if (abs(intensity - this->gaussians[n].getMean()) > abs(intensity - this->gaussians[maxDistanceIndex].getMean()))
+            {
+                maxDistanceIndex = n;
+            }
+        }
+
+        this->eta = (1 / sqrt(2 * M_PI * this->gaussians[maxDistanceIndex].getVariance())) * exp(-(pow(intensity - gaussians[maxDistanceIndex].getMean(), 2)) / (2 * this->gaussians[maxDistanceIndex].getVariance()));
+        break;
+    }
+    case 2:
+    {
+        this->eta = beta_sf;
+        break;
+    }
+    case 3:
+    {
+        this->eta = beta_mf;
+        break;
+    }
+    }
+
+    for (int n = 0; n < this->numberOfGaussians; n++)
+    {
+        this->gaussians[n].setWeight((1 - this->eta) * this->gaussians[n].getWeight() + this->eta * modelMatching[n]);
+    }
+
+    if (modelMatching[minDistanceIndex] == 1)
+    {
+        // Update phase
+        double palpha = this->alpha * (1 / sqrt(2 * M_PI * this->gaussians[minDistanceIndex].getVariance())) * exp(-pow(intensity - this->gaussians[minDistanceIndex].getMean(), 2) / (2 * this->gaussians[minDistanceIndex].getVariance()));
+
+        this->gaussians[minDistanceIndex].setMean((1 - palpha) * this->gaussians[minDistanceIndex].getMean() + palpha * intensity);
+        this->gaussians[minDistanceIndex].setVariance((1 - palpha) * this->gaussians[minDistanceIndex].getVariance() + palpha * pow(intensity - this->gaussians[minDistanceIndex].getMean(), 2));
+    }
+    else
+    {
+        // Replacement phase
+        double minWeight = numeric_limits<double>::infinity();
+        int minWeightIndex = 0;
+        for (int n = 0; n < this->numberOfGaussians; n++)
+        {
+            if (this->gaussians[n].getWeight() < minWeight)
+            {
+                minWeight = this->gaussians[n].getWeight();
+                minWeightIndex = n;
+            }
+        }
+
+        this->gaussians[minWeightIndex].setMean(intensity);
+        this->gaussians[minWeightIndex].setVariance(pow(10, 2));
+        this->gaussians[minWeightIndex].setWeight(0.01);
+    }
+
+    double sum = 0;
+    for (int n = 0; n < this->numberOfGaussians; n++)
+    {
+        sum += this->gaussians[n].getWeight();
+    }
+
+    for (int n = 0; n < this->numberOfGaussians; n++)
+    {
+        this->gaussians[n].setWeight(this->gaussians[n].getWeight() / sum);
+    }
+}
+
+bool Mixture::isForegroundPixel()
+{
+    bool isForeground = false;
+    for (int n = 0; n < this->numberOfGaussians; n++)
+    {
+        if (this->gaussians[n].getWeight() >= .24)
+        {
+            isForeground = true;
             break;
         }
     }
 
-    bool found = false;
-    double weightSum = 0;
-    for (int i = 0; i < this->numberOfGaussians; i++)
-    {
-        double weight = this->gaussians[i].getWeight();
-        double meanB = this->gaussians[i].getMeanB();
-        double meanG = this->gaussians[i].getMeanG();
-        double meanR = this->gaussians[i].getMeanR();
-        double variance = this->gaussians[i].getVariance();
-
-        double distance = pow(meanB - pixel[0], 2) + pow(meanG - pixel[1], 2) + pow(meanR - pixel[2], 2);
-
-        if (distance < 7.5 * variance && i < index)
-        {
-            isBackgrond = true;
-        }
-
-        if (found)
-        {
-            this->gaussians[i].setWeight(weight * (1 - this->alpha));
-            if (this->gaussians[i].getWeight() < 0.0001)
-            {
-                this->gaussians[i].setWeight(0.0001);
-            }
-        }
-        else if (distance < 3 * variance)
-        {
-            this->gaussians[i].setWeight((1 - this->alpha) * weight + this->alpha);
-            double probability = this->gaussians[i].getProbablity(distance);
-
-            this->gaussians[i].setMeanB((1 - this->alpha) * meanB + probability * static_cast<double>(pixel[0]));
-            this->gaussians[i].setMeanG((1 - this->alpha) * meanG + probability * static_cast<double>(pixel[1]));
-            this->gaussians[i].setMeanR((1 - this->alpha) * meanR + probability * static_cast<double>(pixel[2]));
-            this->gaussians[i].setVariance((1 - this->alpha) * variance + probability * (distance - variance));
-
-            if (this->gaussians[i].getVariance() < this->lowerboundVariance)
-            {
-                this->gaussians[i].setVariance(this->lowerboundVariance);
-            }
-            else if (this->gaussians[i].getVariance() > 5 * this->upperboundVariance)
-            {
-                this->gaussians[i].setVariance(5 * this->upperboundVariance);
-            }
-        }
-
-        weightSum += this->gaussians[i].getWeight();
-    }
-
-    if (!found)
-    {
-        Gaussian gaussian(static_cast<double>(pixel[0]), static_cast<double>(pixel[1]), static_cast<double>(pixel[2]), this->lowerboundVariance, this->upperboundVariance, this->gaussians[this->numberOfGaussians - 1].getWeight());
-        this->gaussians[this->numberOfGaussians - 1] = gaussian;
-    }
-
-    for (int i = 0; i < this->numberOfGaussians; i++)
-    {
-        this->gaussians[i].setWeight(this->gaussians[i].getWeight() / weightSum);
-        this->gaussians[i].setWeightDistrRatio(this->gaussians[i].getWeight() / sqrt(this->gaussians[i].getVariance()));
-    }
-
-    // Sort the Gaussian components by their weightRatio
-    sort(this->gaussians.begin(), this->gaussians.end(), [](Gaussian a, Gaussian b)
-         { return a.getWeightDistrRatio() > b.getWeightDistrRatio(); });
-
-    return isBackgrond;
+    return isForeground;
 }

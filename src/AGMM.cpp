@@ -26,7 +26,6 @@ AGMM::AGMM(string videoPath)
 
     this->rows = cap.get(CAP_PROP_FRAME_HEIGHT);
     this->cols = cap.get(CAP_PROP_FRAME_WIDTH);
-    this->numberOfPixels = this->rows * this->cols;
 }
 
 AGMM::~AGMM()
@@ -34,44 +33,31 @@ AGMM::~AGMM()
     this->cap.release();
 }
 
-void AGMM::initializeModel(int numberOfFrames)
+void AGMM::initializeModel()
 {
     // Vector with initialization data for GMM.
     // Each pixel has a vector of Vec3b values.
     // The size of the individual vectors is equal to the number of frames.
-    vector<vector<Vec3b>> initializationData(this->numberOfPixels);
-    Mat frame;
-    for (int i = 0; i < numberOfFrames; i++)
+    this->cap >> this->frame;
+    this->background = this->frame;
+
+
+    if (this->frame.empty())
     {
-        this->cap >> frame;
-        this->background = frame;
-        GaussianBlur(frame, frame, Size(9, 9), 2, 2);
+        cout << "Error: No more frames in video." << endl;
+        return;
+    }
 
-        // test
-        //  If no more frames, error and deconstruct AGMM
-        if (frame.empty())
-        {
-            cout << "Error: No more frames in video." << endl;
-            this->~AGMM();
-            return;
-        }
-
-        for (unsigned int j = 0; j < this->rows; j++)
-        {
-            for (unsigned int k = 0; k < this->cols; k++)
-            {
-
-                initializationData[j * this->cols + k].push_back(frame.at<Vec3b>(j, k));
-            }
+    for (unsigned int i = 0; i < this->rows; i++) {
+        for (unsigned int j = 0; j < this->cols; j++) {
+            Vec3b pixel = this->frame.at<Vec3b>(i, j);
+            Mixture mixture = Mixture(this->BM_numberOfGaussians, this->BM_alpha, this->BM_beta_b, this->BM_beta_s, this->BM_beta_sf, this->BM_beta_mf);
+            this->mixtures.push_back(mixture);
+            mixtures[i * this->cols + j].initializeMixture(pixel);
         }
     }
 
-    for (unsigned int i = 0; i < this->numberOfPixels; i++)
-    {
-        Mixture mixture(this->BM_numberOfGaussians, this->BM_alpha, this->BM_upperboundVariance, this->BM_lowerboundVariance);
-        mixture.initializeMixture(initializationData[i]);
-        this->mixtures.push_back(mixture);
-    }
+
 }
 
 tuple<Mat, Mat, Mat> AGMM::processNextFrame()
@@ -84,41 +70,43 @@ tuple<Mat, Mat, Mat> AGMM::processNextFrame()
     if (this->frame.empty())
     {
         cout << "Error: No more frames in video." << endl;
-        this->~AGMM();
     }
 
-    this->backgroundMaintenance();
-    this->shadowDetection();
+    this->backgroundModelMaintenance();
+    this->foregroundPixelIdentification();
+    //this->shadowDetection();
+    //this->objectExtraction();
     bitwise_and(this->frame, this->frame, this->result, this->mask);
 
     return make_tuple(this->mask, this->result, this->frame);
 }
 
-void AGMM::backgroundMaintenance()
+void AGMM::backgroundModelMaintenance()
 {
     Mat workingFrame;
     GaussianBlur(this->frame, workingFrame, Size(9, 9), 2, 2);
+
+    for (unsigned int i = 0; i < this->rows; i++) {
+        for (unsigned int j = 0; j < this->cols; j++) {
+            Vec3b pixel = workingFrame.at<Vec3b>(i, j);
+            this->mixtures[i * this->cols + j].updateMixture(pixel);
+
+        }
+    }
+}
+
+void AGMM::foregroundPixelIdentification() {
     Mat foregroundMask = Mat::zeros(this->rows, this->cols, CV_8U);
 
-    // Update each mixture and create foreground mask
-    for (unsigned int i = 0; i < this->rows; i++)
-    {
-        for (unsigned int j = 0; j < this->cols; j++)
-        {
-            Vec3b pixel = workingFrame.at<Vec3b>(i, j);
-            bool isBackround = this->mixtures[i * this->cols + j].updateMixture(pixel, this->BM_backgroundRatio);
-            if (!isBackround)
-            {
+    for (unsigned int i = 0; i < this->rows; i++) {
+        for (unsigned int j = 0; j < this->cols; j++) {
+            if (this->mixtures[i * this->cols + j].isForegroundPixel()) {
                 foregroundMask.at<uchar>(i, j) = 255;
-            }
-            else
-            {
-                this->background.at<Vec3b>(i, j) = pixel;
+            } else {
+                this->background.at<Vec3b>(i, j) = this->frame.at<Vec3b>(i, j);
             }
         }
     }
-
-    // foregroundMask = this->maskCleaner(foregroundMask);
 
     this->mask = foregroundMask;
 }
@@ -188,22 +176,20 @@ void AGMM::shadowDetection()
     // shadowMask = shadowMask - roiMask;
 
     this->mask = this->mask - shadowMask;
-
-    this->mask = this->maskCleaner(this->mask);
 }
 
-Mat AGMM::maskCleaner(Mat mask)
+void AGMM::objectExtraction()
 {
     Mat element = getStructuringElement(MORPH_RECT, Size(2 * 2 + 1, 2 * 2 + 1), Point(2, 2));
-    morphologyEx(mask, mask, MORPH_CLOSE, element);
-    morphologyEx(mask, mask, MORPH_OPEN, element);
+    morphologyEx(this->mask, this->mask, MORPH_CLOSE, element);
+    morphologyEx(this->mask, this->mask, MORPH_OPEN, element);
 
     Rect boundingBox;
     vector<vector<Point>> contours;
     vector<int> contourIndices;
     vector<Vec4i> hierarchy;
 
-    findContours(mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
+    findContours(this->mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
     Mat cleanedMask = Mat::zeros(this->rows, this->cols, CV_8U);
 
     for (unsigned int i = 0; i < contours.size(); i++)
@@ -220,5 +206,5 @@ Mat AGMM::maskCleaner(Mat mask)
         drawContours(cleanedMask, contours, contourIndices[i], Scalar(255), FILLED, 8, hierarchy, 0);
     }
 
-    return cleanedMask;
+    this->mask = cleanedMask;
 }

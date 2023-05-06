@@ -18,10 +18,11 @@ class AGMM
 private:
     // Background maintenance parameters
     double BM_numberOfGaussians = 7;
-    double BM_alpha = 0.001;
-    double BM_backgroundRatio = 0.9;
-    double BM_upperboundVariance = 36;
-    double BM_lowerboundVariance = 8;
+    double BM_alpha = 0.025;
+    double BM_beta_b = 0.05;
+    double BM_beta_s = 0.05;
+    double BM_beta_sf = 0.0011;
+    double BM_beta_mf = .00017;
 
     // Shadow detection parameters
     double SD_hueThreshold = 62;
@@ -37,14 +38,13 @@ private:
 
     unsigned int rows;
     unsigned int cols;
-    unsigned int numberOfPixels;
 
     vector<Mixture> mixtures;
 
-    void backgroundMaintenance();
+    void backgroundModelMaintenance();
+    void foregroundPixelIdentification();
     void shadowDetection();
-
-    Mat maskCleaner(Mat mask);
+    void objectExtraction();
 
 public:
     /**
@@ -59,7 +59,7 @@ public:
      * Initialize the model.
      * @param numberOfFrames The number of frames to use for initialization.
      */
-    void initializeModel(int numberOfFrames);
+    void initializeModel();
 
     /**
      * Process the next frame and return the foreground mask.

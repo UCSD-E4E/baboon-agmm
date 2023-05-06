@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     }
 
     AGMM agmm(argv[optind]);
-    agmm.initializeModel(10);
+    agmm.initializeModel();
 
     Mat frame, foregroundMask, foregroundMaskBGR, foregroundImage, combinedFrame, resizedFrame;
 
