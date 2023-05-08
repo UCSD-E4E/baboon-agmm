@@ -29,8 +29,9 @@ void Mixture::initializeMixture(Vec3b pixel)
     {
         // Calculate the intensity of the pixel
         double mean = (pixel[0] + pixel[1] + pixel[2]) / 3;
+        double weight = 1.0 / this->numberOfGaussians;
 
-        Gaussian gaussian(mean, 1 / this->numberOfGaussians);
+        Gaussian gaussian(mean, weight);
         this->gaussians.push_back(gaussian);
     }
 }
@@ -40,7 +41,13 @@ void Mixture::updateMixture(Vec3b pixel)
     // Calculate the intensity of the pixel
     double intensity = (pixel[0] + pixel[1] + pixel[2]) / 3;
     double modelMatching[this->numberOfGaussians]{0};
-    double distances[this->numberOfGaussians]{numeric_limits<double>::infinity()};
+    double distances[this->numberOfGaussians];
+
+    for (int n = 0; n < this->numberOfGaussians; n++)
+    {
+        // set distances to infinity
+        distances[n] = double(numeric_limits<double>::infinity());
+    }
 
     for (int n = 0; n < this->numberOfGaussians; n++)
     {
@@ -136,7 +143,7 @@ void Mixture::updateMixture(Vec3b pixel)
         this->gaussians[minWeightIndex].setWeight(0.01);
     }
 
-    double sum = 0;
+     double sum = 0;
     for (int n = 0; n < this->numberOfGaussians; n++)
     {
         sum += this->gaussians[n].getWeight();

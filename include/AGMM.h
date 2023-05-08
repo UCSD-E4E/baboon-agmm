@@ -17,7 +17,7 @@ class AGMM
 {
 private:
     // Background maintenance parameters
-    double BM_numberOfGaussians = 7;
+    double BM_numberOfGaussians = 3;
     double BM_alpha = 0.025;
     double BM_beta_b = 0.05;
     double BM_beta_s = 0.05;

@@ -1,8 +1,9 @@
 #ifndef Gaussian_H
 #define Gaussian_H
 
-#include <vector>
 #include <opencv2/opencv.hpp>
+#include <vector>
+
 
 using namespace cv;
 using namespace std;
