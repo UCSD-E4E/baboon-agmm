@@ -22,23 +22,44 @@ Mixture::~Mixture()
     this->gaussians.clear();
 }
 
-void Mixture::initializeMixture(Vec3b pixel)
+void Mixture::initializeMixture(vector<Vec3b> pixels)
 {
     // Initialize the Gaussian components
     for (int i = 0; i < this->numberOfGaussians; i++)
     {
-        if (i == 0) {
-            double mean = (pixel[0] + pixel[1] + pixel[2]) / 3;
-            Gaussian gaussian(mean, 1, 1);
-            this->gaussians.push_back(gaussian);
-        }
-        else 
+        Gaussian gaussian = Gaussian(0, 0, 0);
+        this->gaussians.push_back(gaussian);
+    }
+
+    // Randomly select pixels
+    random_shuffle(pixels.begin(), pixels.end());
+    pixels.resize(this->numberOfGaussians);
+
+    // Initiialize the mean and varience of the Gaussian components using the pixel intensities
+    for (int k = 0; k < this->numberOfGaussians; k++)
+    {
+        double mean = 0;
+        double variance = 0;
+
+        mean = (pixels[k][0] + pixels[k][1] + pixels[k][2]) / 3;
+
+        for (long unsigned int i = 0; i < pixels.size(); i++)
         {
-            Gaussian gaussian(0, 10*10, 0);
-            this->gaussians.push_back(gaussian);
+            double diff = (pixels[i][0] + pixels[i][1] + pixels[i][2]) / 3 - mean;
+            variance += diff * diff;
         }
 
+        variance /= pixels.size();
 
+        // Set the mean and variance of the Gaussian component
+        this->gaussians[k].setMean(mean);
+        this->gaussians[k].setVariance(variance);
+    }
+
+    // Set the weights of the Gaussian compenents
+    for (int k = 0; k < this->numberOfGaussians; k++)
+    {
+        this->gaussians[k].setWeight(1.0 / this->numberOfGaussians);
     }
 }
 
@@ -149,7 +170,7 @@ void Mixture::updateMixture(Vec3b pixel)
         this->gaussians[minWeightIndex].setWeight(0.01);
     }
 
-     double sum = 0;
+    double sum = 0;
     for (int n = 0; n < this->numberOfGaussians; n++)
     {
         sum += this->gaussians[n].getWeight();
@@ -161,17 +182,41 @@ void Mixture::updateMixture(Vec3b pixel)
     }
 }
 
-bool Mixture::isForegroundPixel()
+bool Mixture::isForegroundPixel(Vec3b pixel)
 {
-    bool isForeground = false;
+    // Calculate the intensity of the pixel
+    double intensity = (pixel[0] + pixel[1] + pixel[2]) / 3;
+
+    // Calculate the mixture probabilities for each Gaussian
+    double mixtureProbabilities[this->numberOfGaussians];
     for (int n = 0; n < this->numberOfGaussians; n++)
     {
-        if (this->gaussians[n].getWeight() >= .9)
+        mixtureProbabilities[n] = this->gaussians[n].getWeight() * (1 / sqrt(2 * M_PI * this->gaussians[n].getVariance())) * exp(-pow(intensity - this->gaussians[n].getMean(), 2) / (2 * this->gaussians[n].getVariance()));
+    }
+
+    // Calculate the foreground probability using the two Gaussians with the highest weights
+    double maxWeight1 = 0;
+    double maxWeight2 = 0;
+    int maxIndex1 = 0;
+    int maxIndex2 = 0;
+    for (int n = 0; n < this->numberOfGaussians; n++)
+    {
+        if (this->gaussians[n].getWeight() > maxWeight1)
         {
-            isForeground = true;
-            break;
+            maxWeight2 = maxWeight1;
+            maxIndex2 = maxIndex1;
+            maxWeight1 = this->gaussians[n].getWeight();
+            maxIndex1 = n;
+        }
+        else if (this->gaussians[n].getWeight() > maxWeight2)
+        {
+            maxWeight2 = this->gaussians[n].getWeight();
+            maxIndex2 = n;
         }
     }
 
-    return isForeground;
+    double foregroundProbability = mixtureProbabilities[maxIndex1] / (mixtureProbabilities[maxIndex1] + mixtureProbabilities[maxIndex2]);
+
+    // Return true if the pixel is classified as foreground, false otherwise
+    return (foregroundProbability > .24);
 }
