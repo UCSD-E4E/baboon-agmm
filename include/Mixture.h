@@ -12,7 +12,7 @@ private:
     int numberOfGaussians;
 
     int O = 0;
-    double eta = .1;
+    double eta = 1;
     double alpha;
     double beta_b;
     double beta_s;

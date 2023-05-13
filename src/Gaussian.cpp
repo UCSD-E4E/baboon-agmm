@@ -1,9 +1,9 @@
 #include "../include/Gaussian.h"
 
-Gaussian::Gaussian(double mean, double weight)
+Gaussian::Gaussian(double mean, double varience, double weight)
 {
     this->mean = mean;
-    this->variance = 100;
+    this->variance = varience;
     this->weight = weight;
 }
 

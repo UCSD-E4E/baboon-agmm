@@ -15,7 +15,7 @@ private:
     double variance;
     double weight;
 public:
-    Gaussian(double mean, double weight);
+    Gaussian(double mean, double varience, double weight);
 
     ~Gaussian();
 

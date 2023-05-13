@@ -27,12 +27,18 @@ void Mixture::initializeMixture(Vec3b pixel)
     // Initialize the Gaussian components
     for (int i = 0; i < this->numberOfGaussians; i++)
     {
-        // Calculate the intensity of the pixel
-        double mean = (pixel[0] + pixel[1] + pixel[2]) / 3;
-        double weight = 1.0 / this->numberOfGaussians;
+        if (i == 0) {
+            double mean = (pixel[0] + pixel[1] + pixel[2]) / 3;
+            Gaussian gaussian(mean, 1, 1);
+            this->gaussians.push_back(gaussian);
+        }
+        else 
+        {
+            Gaussian gaussian(0, 10*10, 0);
+            this->gaussians.push_back(gaussian);
+        }
 
-        Gaussian gaussian(mean, weight);
-        this->gaussians.push_back(gaussian);
+
     }
 }
 
@@ -160,7 +166,7 @@ bool Mixture::isForegroundPixel()
     bool isForeground = false;
     for (int n = 0; n < this->numberOfGaussians; n++)
     {
-        if (this->gaussians[n].getWeight() >= .24)
+        if (this->gaussians[n].getWeight() >= .9)
         {
             isForeground = true;
             break;
