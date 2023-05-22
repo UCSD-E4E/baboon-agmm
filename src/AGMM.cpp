@@ -35,37 +35,8 @@ AGMM::~AGMM()
 
 void AGMM::initializeModel()
 {
-    // Vector with initialzation data for GMM.
-    // Each pixel has a vector of Vec3b values.
-    // The size of the individual vectors is equal to the number of frames used for initialization.
-    vector<vector<Vec3b>> pixels(this->rows * this->cols, vector<Vec3b>());
-
-    // Initialize the model with the first 10 frames
-    for (int i = 0; i < 10; i++)
-    {
-        this->cap >> this->frame;
-        this->background = this->frame.clone();
-
-        // If no more frames, error and deconstruct AGMM
-        if (this->frame.empty())
-        {
-            cout << "Error: No more frames in video." << endl;
-            this->~AGMM();
-            return;
-        }
-
-        Mat workingFrame;
-        GaussianBlur(this->frame, workingFrame, Size(9, 9), 2, 2);
-
-        for (unsigned int i = 0; i < this->rows; i++)
-        {
-            for (unsigned int j = 0; j < this->cols; j++)
-            {
-                Vec3b pixel = workingFrame.at<Vec3b>(i, j);
-                pixels[i * this->cols + j].push_back(pixel);
-            }
-        }
-    }
+    this->cap >> this->frame;
+    this->background = this->frame.clone();
 
     // Give each mixture a vector of pixels
     for (unsigned int i = 0; i < this->rows; i++)
@@ -74,7 +45,7 @@ void AGMM::initializeModel()
         {
             Mixture mixture = Mixture(this->BM_numberOfGaussians, this->BM_alpha, this->BM_beta_b, this->BM_beta_s, this->BM_beta_sf, this->BM_beta_mf);
             this->mixtures.push_back(mixture);
-            mixtures[i * this->cols + j].initializeMixture(pixels[i * this->cols + j]);
+            mixtures[i * this->cols + j].initializeMixture();
         }
     }
 
@@ -83,6 +54,7 @@ void AGMM::initializeModel()
 tuple<Mat, Mat, Mat> AGMM::processNextFrame()
 {
     this->cap >> this->frame;
+    
     this->mask = Mat::zeros(this->rows, this->cols, CV_8U);
     this->result = Mat::zeros(this->rows, this->cols, CV_8UC3);
 
@@ -104,11 +76,13 @@ tuple<Mat, Mat, Mat> AGMM::processNextFrame()
 void AGMM::backgroundModelMaintenance()
 {
     Mat workingFrame;
-    GaussianBlur(this->frame, workingFrame, Size(9, 9), 2, 2);
+    cvtColor(this->frame, workingFrame, COLOR_BGR2GRAY);
+    GaussianBlur(workingFrame, workingFrame, Size(9, 9), 2, 2);
+
 
     for (unsigned int i = 0; i < this->rows; i++) {
         for (unsigned int j = 0; j < this->cols; j++) {
-            Vec3b pixel = workingFrame.at<Vec3b>(i, j);
+            double pixel = static_cast<double>(workingFrame.at<uchar>(i, j));
             this->mixtures[i * this->cols + j].updateMixture(pixel);
 
         }
@@ -116,14 +90,14 @@ void AGMM::backgroundModelMaintenance()
 }
 
 void AGMM::foregroundPixelIdentification() {
-    Mat workingFrame;
-    GaussianBlur(this->frame, workingFrame, Size(9, 9), 2, 2);
+    // Mat workingFrame;
+    // GaussianBlur(this->frame, workingFrame, Size(9, 9), 2, 2);
     Mat foregroundMask = Mat::zeros(this->rows, this->cols, CV_8U);
-
+    
     for (unsigned int i = 0; i < this->rows; i++) {
         for (unsigned int j = 0; j < this->cols; j++) {
-            Vec3b pixel = workingFrame.at<Vec3b>(i, j);
-            if (this->mixtures[i * this->cols + j].isForegroundPixel(pixel)) {
+            // Vec3b pixel = workingFrame.at<Vec3b>(i, j);
+            if (this->mixtures[i * this->cols + j].isForegroundPixel()) {
                 foregroundMask.at<uchar>(i, j) = 255;
             } else {
                 this->background.at<Vec3b>(i, j) = this->frame.at<Vec3b>(i, j);

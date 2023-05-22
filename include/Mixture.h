@@ -11,8 +11,8 @@ class Mixture
 private:
     int numberOfGaussians;
 
-    int O = 1;
-    double eta = 1;
+    int O = 0;
+    double eta = 1/6000;
     double alpha;
     double beta_b;
     double beta_s;
@@ -26,11 +26,11 @@ public:
 
     ~Mixture();
 
-    void initializeMixture(vector<Vec3b> pixels);
+    void initializeMixture();
     
-    void updateMixture(Vec3b pixel);
+    void updateMixture(double intensity);
 
-    bool isForegroundPixel(Vec3b pixel);
+    bool isForegroundPixel();
 };
 
 #endif

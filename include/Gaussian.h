@@ -4,7 +4,6 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 
-
 using namespace cv;
 using namespace std;
 
@@ -14,16 +13,17 @@ private:
     double mean;
     double variance;
     double weight;
+
 public:
     Gaussian(double mean, double varience, double weight);
 
     ~Gaussian();
 
-    double getMean();
+    double getMean() const;
 
-    double getVariance();
+    double getVariance() const;
 
-    double getWeight();
+    double getWeight() const;
 
     void setMean(double mean);
 
