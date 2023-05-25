@@ -20,9 +20,9 @@ private:
     double BM_numberOfGaussians = 100;
     double BM_alpha = 0.025;
     double BM_beta_b = 0.05;
-    double BM_beta_s = 0.05;
-    double BM_beta_sf = 0.0011;
-    double BM_beta_mf = .00017;
+    double BM_beta_d = 0.05;
+    double BM_beta_s = 0.0011;
+    double BM_beta_m = 0.00017;
 
     // Shadow detection parameters
     double SD_hueThreshold = 62;
@@ -33,7 +33,9 @@ private:
     VideoCapture cap;
     Mat frame;
     Mat background;
-    Mat mask;
+    Mat objectMask;
+    Mat shadowMask;
+    Mat finalMask;
     Mat result;
 
     unsigned int rows;
@@ -45,6 +47,7 @@ private:
     void foregroundPixelIdentification();
     void shadowDetection();
     void objectExtraction();
+    void objectTypeClassification();
 
 public:
     /**
