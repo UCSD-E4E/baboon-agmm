@@ -38,14 +38,19 @@ void AGMM::initializeModel()
     this->cap >> this->frame;
     this->background = this->frame.clone();
 
+    Mat workingFrame;
+    cvtColor(this->frame, workingFrame, COLOR_BGR2GRAY);
+    GaussianBlur(workingFrame, workingFrame, Size(9, 9), 2, 2);
+
     // Give each mixture a vector of pixels
     for (unsigned int i = 0; i < this->rows; i++)
     {
         for (unsigned int j = 0; j < this->cols; j++)
         {
-            Mixture mixture = Mixture(this->BM_numberOfGaussians, this->BM_alpha, this->BM_beta_b, this->BM_beta_s, this->BM_beta_sf, this->BM_beta_mf);
+            double intensity = static_cast<double>(workingFrame.at<uchar>(i, j));
+            Mixture mixture = Mixture(this->BM_numberOfGaussians, this->BM_alpha, this->BM_beta_b, this->BM_beta_d, this->BM_beta_s, this->BM_beta_m);
             this->mixtures.push_back(mixture);
-            mixtures[i * this->cols + j].initializeMixture();
+            mixtures[i * this->cols + j].initializeMixture(intensity);
         }
     }
 
@@ -55,7 +60,9 @@ tuple<Mat, Mat, Mat> AGMM::processNextFrame()
 {
     this->cap >> this->frame;
     
-    this->mask = Mat::zeros(this->rows, this->cols, CV_8U);
+    this->objectMask = Mat::zeros(this->rows, this->cols, CV_8U);
+    this->shadowMask = Mat::zeros(this->rows, this->cols, CV_8U);
+    this->finalMask = Mat::zeros(this->rows, this->cols, CV_8U);
     this->result = Mat::zeros(this->rows, this->cols, CV_8UC3);
 
     // If no more frames, error and deconstruct AGMM
@@ -66,11 +73,12 @@ tuple<Mat, Mat, Mat> AGMM::processNextFrame()
 
     this->backgroundModelMaintenance();
     this->foregroundPixelIdentification();
-    //this->shadowDetection();
-    //this->objectExtraction();
-    bitwise_and(this->frame, this->frame, this->result, this->mask);
+    this->shadowDetection();
+    this->objectExtraction();
+    this->objectTypeClassification();
+    bitwise_and(this->frame, this->frame, this->result, this->finalMask);
 
-    return make_tuple(this->mask, this->result, this->frame);
+    return make_tuple(this->finalMask, this->result, this->frame);
 }
 
 void AGMM::backgroundModelMaintenance()
@@ -90,8 +98,6 @@ void AGMM::backgroundModelMaintenance()
 }
 
 void AGMM::foregroundPixelIdentification() {
-    // Mat workingFrame;
-    // GaussianBlur(this->frame, workingFrame, Size(9, 9), 2, 2);
     Mat foregroundMask = Mat::zeros(this->rows, this->cols, CV_8U);
     
     for (unsigned int i = 0; i < this->rows; i++) {
@@ -105,7 +111,8 @@ void AGMM::foregroundPixelIdentification() {
         }
     }
 
-    this->mask = foregroundMask;
+    this->objectMask = foregroundMask;
+    this->finalMask = foregroundMask;
 }
 
 void AGMM::shadowDetection()
@@ -155,38 +162,22 @@ void AGMM::shadowDetection()
         }
     }
 
-    // Mat element = getStructuringElement(MORPH_RECT, Size(2 * 2 + 1, 2 * 2 + 1), Point(2, 2));
-    // Mat cannyFrame, grayFrame, roiMask;
-
-    // cvtColor(this->frame, grayFrame, COLOR_BGR2GRAY);
-
-    // Canny(grayFrame, cannyFrame, 50, 150);
-    // threshold(cannyFrame, cannyFrame, 100, 255, THRESH_BINARY);
-
-    // morphologyEx(this->mask, roiMask, MORPH_DILATE, element);
-    // morphologyEx(roiMask, roiMask, MORPH_DILATE, element);
-
-    // bitwise_and(roiMask, cannyFrame, roiMask);
-
-    // morphologyEx(roiMask, roiMask, MORPH_ERODE, element);
-
-    // shadowMask = shadowMask - roiMask;
-
-    this->mask = this->mask - shadowMask;
+    this->shadowMask = shadowMask;
+    this-> finalMask = this->finalMask - shadowMask;
 }
 
 void AGMM::objectExtraction()
 {
     Mat element = getStructuringElement(MORPH_RECT, Size(2 * 2 + 1, 2 * 2 + 1), Point(2, 2));
-    morphologyEx(this->mask, this->mask, MORPH_CLOSE, element);
-    morphologyEx(this->mask, this->mask, MORPH_OPEN, element);
+    morphologyEx(this->finalMask, this->finalMask, MORPH_CLOSE, element);
+    morphologyEx(this->finalMask, this->finalMask, MORPH_OPEN, element);
 
     Rect boundingBox;
     vector<vector<Point>> contours;
     vector<int> contourIndices;
     vector<Vec4i> hierarchy;
 
-    findContours(this->mask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
+    findContours(this->finalMask, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
     Mat cleanedMask = Mat::zeros(this->rows, this->cols, CV_8U);
 
     for (unsigned int i = 0; i < contours.size(); i++)
@@ -203,5 +194,24 @@ void AGMM::objectExtraction()
         drawContours(cleanedMask, contours, contourIndices[i], Scalar(255), FILLED, 8, hierarchy, 0);
     }
 
-    this->mask = cleanedMask;
+    this->finalMask = cleanedMask;
+}
+
+void AGMM::objectTypeClassification() {
+    Mat workingFrame;
+    cvtColor(this->frame, workingFrame, COLOR_BGR2GRAY);
+    GaussianBlur(workingFrame, workingFrame, Size(9, 9), 2, 2);
+
+    // Loop through each pixel to get their mixture
+    for (unsigned int i = 0; i < this->rows; i++) {
+        for (unsigned int j = 0; j < this->cols; j++) {
+            double pixel = static_cast<double>(workingFrame.at<uchar>(i, j));
+            Mixture mixture = this->mixtures[i * this->cols + j];
+            // if pixel is not white in objectMask
+            if (this->objectMask.at<uchar>(i,j) == 0) mixture.updateEta(0, pixel);
+            else if (this->objectMask.at<uchar>(i,j) == 255 && this->shadowMask.at<uchar>(i,j) == 255) mixture.updateEta(1, pixel);
+            else (mixture.updateEta(3, pixel));
+
+        }
+    }
 }
