@@ -36,6 +36,8 @@ void Mixture::initializeMixture(double intensity)
         Gaussian gaussian(intensity, 100.0, 1.0 / this->numberOfGaussians);
         this->gaussians.push_back(gaussian);
     }
+
+    this->etas.push_back(this->eta);
 }
 
 void Mixture::updateMixture(double intensity)
@@ -131,7 +133,8 @@ void Mixture::updateEta(int O, double intensity)
     case 0:
     {
         // (1 - Beta_b) * eta_{t-1,x} + eta_{b}*Beta_b
-        this->eta = (1.0 - this->beta_b) * this->eta + .025 * this->beta_b;
+        this->eta = (1.0 - this->beta_b) * this->eta + 0.025 * this->beta_b;
+        this->etas.push_back(this->eta);
         break;
     }
     case 1:
@@ -152,18 +155,22 @@ void Mixture::updateEta(int O, double intensity)
         {
             this->eta = this->beta_s;
         }
+        this->etas.push_back(this->eta);
         break;
     }
     case 2:
     {
         // B_s
         this->eta = this->beta_s;
+        this->etas.push_back(this->eta);
         break;
     }
     case 3:
     {
         // B_m
         this->eta = this->beta_m;
+        this->etas.push_back(this->eta);
+        break;
     }
     }
 }

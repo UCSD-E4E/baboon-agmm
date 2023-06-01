@@ -16,13 +16,14 @@ private:
     double beta_b;
     double beta_d;
     double beta_s;
-    double beta_m;;
-
-    vector<Gaussian> gaussians;
+    double beta_m;
 
     double calculateProbablility(double intensity, double mean, double variance);
 
 public:
+    vector<double> etas;
+    vector<Gaussian> gaussians;
+
     Mixture(double numberOfGaussians, double alpha, double beta_b, double beta_s, double beta_sf, double beta_mf);
 
     ~Mixture();

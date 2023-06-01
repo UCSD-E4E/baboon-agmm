@@ -19,10 +19,10 @@ private:
     // Background maintenance parameters
     double BM_numberOfGaussians = 100;
     double BM_alpha = 0.025;
-    double BM_beta_b = 0.05;
-    double BM_beta_d = 0.05;
-    double BM_beta_s = 0.0011;
-    double BM_beta_m = 0.00017;
+    double BM_beta_b = 0.01;
+    double BM_beta_d = 1.0/100.0;
+    double BM_beta_s = 1.0/900.0;
+    double BM_beta_m = 1.0/6000.0;
 
     // Shadow detection parameters
     double SD_hueThreshold = 62;
@@ -38,8 +38,7 @@ private:
     Mat finalMask;
     Mat result;
 
-    unsigned int rows;
-    unsigned int cols;
+
 
     vector<Mixture> mixtures;
 
@@ -50,6 +49,9 @@ private:
     void objectTypeClassification();
 
 public:
+    unsigned int rows;
+    unsigned int cols;
+
     /**
      * Initialize the AGMM algorithm.
      * @param videoPath The path to the video file.
@@ -69,6 +71,10 @@ public:
      * @return The foreground mask.
      */
     tuple<Mat, Mat, Mat> processNextFrame();
+
+    vector<double> getPixelEtas(int row, int col);
+
+    vector<Gaussian> getPixelGaussians(int row, int col);
 };
 
 #endif
