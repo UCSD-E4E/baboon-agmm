@@ -4,8 +4,6 @@
 #include "Gaussian.h"
 #include <opencv2/opencv.hpp>
 
-using namespace cv;
-
 class Mixture
 {
 private:
@@ -21,10 +19,10 @@ private:
     double calculateProbablility(double intensity, double mean, double variance);
 
 public:
-    vector<double> etas;
-    vector<Gaussian> gaussians;
+    std::vector<double> etas;
+    std::vector<Gaussian> gaussians;
 
-    Mixture(double numberOfGaussians, double alpha, double beta_b, double beta_s, double beta_sf, double beta_mf);
+    Mixture(int numberOfGaussians, double alpha, double beta_b, double beta_s, double beta_sf, double beta_mf);
 
     ~Mixture();
 
@@ -32,7 +30,7 @@ public:
     
     void updateMixture(double intensity);
 
-    bool isForegroundPixel();
+    bool isForegroundPixel() const;
 
     void updateEta(int O, double intensity);
 };

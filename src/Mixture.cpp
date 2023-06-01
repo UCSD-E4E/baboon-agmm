@@ -7,7 +7,7 @@
 using namespace cv;
 using namespace std;
 
-Mixture::Mixture(double numberOfGaussians, double alpha, double beta_b, double beta_d, double beta_s, double beta_m)
+Mixture::Mixture(int numberOfGaussians, double alpha, double beta_b, double beta_d, double beta_s, double beta_m)
 {
     this->numberOfGaussians = numberOfGaussians;
     this->alpha = alpha;
@@ -19,7 +19,7 @@ Mixture::Mixture(double numberOfGaussians, double alpha, double beta_b, double b
 
 Mixture::~Mixture()
 {
-    this->gaussians.clear();
+    // Nothing to do here
 }
 
 double calculateProbability(double intensity, double mean, double variance)
@@ -33,7 +33,7 @@ void Mixture::initializeMixture(double intensity)
     // Initialize this->gaussians with this->numberOfGaussians Gaussian distributions. Mean is intensity, variance is 100, and weight is 1 / this->numberOfGaussians
     for (int n = 0; n < this->numberOfGaussians; n++)
     {
-        Gaussian gaussian(intensity, 100.0, 1.0 / this->numberOfGaussians);
+        Gaussian gaussian(intensity, 100.0, 1.0 / static_cast<double>(this->numberOfGaussians));
         this->gaussians.push_back(gaussian);
     }
 
@@ -111,13 +111,20 @@ void Mixture::updateMixture(double intensity)
         sumOfWeights += this->gaussians[n].getWeight();
     }
 
-    for (int n = 0; n < this->numberOfGaussians; n++)
+    if (sumOfWeights == 0)
     {
-        this->gaussians[n].setWeight(this->gaussians[n].getWeight() / sumOfWeights);
+        throw runtime_error("sumOfWeights is zero, cannot divide by zero");
+    }
+    else
+    {
+        for (int n = 0; n < this->numberOfGaussians; n++)
+        {
+            this->gaussians[n].setWeight(this->gaussians[n].getWeight() / sumOfWeights);
+        }
     }
 }
 
-bool Mixture::isForegroundPixel()
+bool Mixture::isForegroundPixel() const 
 {
     // F_{t,x,n} = {0, if w_{t,x,n} >= T_w, 1, otherwise}, where n is the heighest weighted Gaussian
     int currentGaussianIndex = distance(this->gaussians.begin(), max_element(this->gaussians.begin(), this->gaussians.end(), [](const Gaussian &g1, const Gaussian &g2)

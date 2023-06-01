@@ -1,12 +1,6 @@
 #ifndef Gaussian_H
 #define Gaussian_H
 
-#include <opencv2/opencv.hpp>
-#include <vector>
-
-using namespace cv;
-using namespace std;
-
 class Gaussian
 {
 private:
@@ -15,21 +9,21 @@ private:
     double weight;
 
 public:
-    Gaussian(double mean, double varience, double weight);
+    Gaussian(double mean, double variance, double weight) : mean(mean), variance(variance), weight(weight) {}
 
-    ~Gaussian();
+    ~Gaussian() = default;
 
-    double getMean() const;
+    double getMean() const { return mean; }
 
-    double getVariance() const;
+    double getVariance() const { return variance; }
 
-    double getWeight() const;
+    double getWeight() const { return weight; }
 
-    void setMean(double mean);
+    void setMean(double mean) { this->mean = mean; }
 
-    void setVariance(double variance);
+    void setVariance(double variance) { this->variance = variance; }
 
-    void setWeight(double weight);
+    void setWeight(double weight) { this->weight = weight; }
 };
 
 #endif

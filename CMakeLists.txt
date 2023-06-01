@@ -33,7 +33,6 @@ set(SOURCE_FILES
     include/Gaussian.h
     src/AGMM.cpp
     src/Mixture.cpp
-    src/Gaussian.cpp
     imGUI/imconfig.h
     imGUI/imgui_demo.cpp
     imGUI/imgui_draw.cpp

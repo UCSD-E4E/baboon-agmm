@@ -103,15 +103,24 @@ int main(int argc, char **argv)
     if (record)
     {
         AGMM agmm(argv[optind]);
+        cout << "Recording" << endl;
         agmm.initializeModel();
+        cout << "Model Initialized" << endl;
 
         Mat frame, foregroundMask, foregroundMaskBGR, foregroundImage, combinedFrame, resizedFrame;
 
         VideoWriter videoWriter;
         bool isVideoWriterInitialized = false;
 
+
+        int frameCount = 1;
+        cout << "Processing Frames" << endl;
+
         while (true) {
             tie(foregroundMask, foregroundImage, frame) = agmm.processNextFrame();
+
+            frameCount++;
+
 
             if (frame.empty())
             {
@@ -120,18 +129,17 @@ int main(int argc, char **argv)
 
             cvtColor(foregroundMask, foregroundMaskBGR, COLOR_GRAY2BGR);
             hconcat(frame, foregroundMaskBGR, combinedFrame);
-            resize(combinedFrame, resizedFrame, Size(), 0.5, 0.5, INTER_LINEAR);
 
 
             if (!isVideoWriterInitialized)
             {
-                videoWriter.open("output.avi", VideoWriter::fourcc('x', '2', '6', '4'), 25, resizedFrame.size());
+                videoWriter.open("output.avi", VideoWriter::fourcc('x', '2', '6', '4'), 25, combinedFrame.size());
                 isVideoWriterInitialized = true;
             }
 
-            videoWriter.write(resizedFrame);
+            videoWriter.write(combinedFrame);
+            cout << "Frame Count: " << frameCount << endl;
 
-            imshow("Background Subtraction", resizedFrame);
 
             // Do not wait for a key press
             if (waitKey(1) >= 0)
@@ -235,8 +243,8 @@ int main(int argc, char **argv)
                 frameCounter++;
             }
 
-            float widgetWidth = agmm.cols;
-            float widgetHeight = agmm.rows;
+            double widgetWidth = agmm.cols;
+            double widgetHeight = agmm.rows;
 
             // Display foregroundMaskBGRTextureID, foregroundImageTextureID, frameTextureID
             ImGui::Begin("Background Subtraction");
