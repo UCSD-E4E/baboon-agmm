@@ -101,7 +101,7 @@ void AGMM::backgroundModelMaintenance()
 void AGMM::foregroundPixelIdentification() {
     Mat foregroundMask = Mat::zeros(this->rows, this->cols, CV_8U);
     
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for collapse(2) limit(4)
     for (unsigned int i = 0; i < this->rows; i++) {
         for (unsigned int j = 0; j < this->cols; j++) {
             if (this->mixtures[i * this->cols + j].isForegroundPixel()) 
