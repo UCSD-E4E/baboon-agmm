@@ -3,6 +3,7 @@
 #include <getopt.h>
 #include <numeric>
 #include <opencv2/opencv.hpp>
+#include <omp.h>
 
 #include "imGUI/imgui.h"
 #include "imGUI/imgui_impl_glfw.h"
@@ -80,6 +81,8 @@ int main(int argc, char **argv)
         cout << "Usage: BackgroundSubtraction <video_path> [-r|--record]" << endl;
         return -1;
     }
+
+    omp_set_num_threads(4);
 
     bool record = false;
     int c;
