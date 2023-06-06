@@ -8,13 +8,33 @@
  */
 #include "../include/AGMM.h"
 #include <opencv2/opencv.hpp>
+
+#ifdef WITH_OPENMP
 #include <omp.h>
+#endif
 
 using namespace cv;
 using namespace std;
 
 AGMM::AGMM(string videoPath)
 {
+    this->cap = VideoCapture(videoPath);
+
+    // If video cannot be opened, error and deconstruct AGMM
+    if (!this->cap.isOpened())
+    {
+        cout << "Error: Video cannot be opened." << endl;
+        this->~AGMM();
+        return;
+    }
+
+    this->rows = cap.get(CAP_PROP_FRAME_HEIGHT);
+    this->cols = cap.get(CAP_PROP_FRAME_WIDTH);
+}
+
+AGMM::AGMM(string videoPath, bool debug)
+{
+    this->debug = debug;
     this->cap = VideoCapture(videoPath);
 
     // If video cannot be opened, error and deconstruct AGMM
@@ -41,7 +61,7 @@ void AGMM::initializeModel()
 
     Mat workingFrame;
     cvtColor(this->frame, workingFrame, COLOR_BGR2GRAY);
-    GaussianBlur(workingFrame, workingFrame, Size(3, 3), 0, 0);
+    GaussianBlur(workingFrame, workingFrame, Size(5, 5), 0);
 
     // Give each mixture a vector of pixels
     for (unsigned int i = 0; i < this->rows; i++)
@@ -86,9 +106,11 @@ void AGMM::backgroundModelMaintenance()
 {
     Mat workingFrame;
     cvtColor(this->frame, workingFrame, COLOR_BGR2GRAY);
-    GaussianBlur(workingFrame, workingFrame, Size(3, 3), 0, 0);
+    GaussianBlur(workingFrame, workingFrame, Size(5, 5), 0);
 
+    #ifdef WITH_OPENMP
     #pragma omp parallel for collapse(2)
+    #endif
     for (unsigned int i = 0; i < this->rows; i++) {
         for (unsigned int j = 0; j < this->cols; j++) {
             double pixel = static_cast<double>(workingFrame.at<uchar>(i, j));
@@ -101,15 +123,21 @@ void AGMM::backgroundModelMaintenance()
 void AGMM::foregroundPixelIdentification() {
     Mat foregroundMask = Mat::zeros(this->rows, this->cols, CV_8U);
     
-    #pragma omp parallel for collapse(2) limit(4)
+    #ifdef WITH_OPENMP
+    #pragma omp parallel for collapse(2)
+    #endif
     for (unsigned int i = 0; i < this->rows; i++) {
         for (unsigned int j = 0; j < this->cols; j++) {
             if (this->mixtures[i * this->cols + j].isForegroundPixel()) 
+            #ifdef WITH_OPENMP
             #pragma omp critical
+            #endif
             {
                 foregroundMask.at<uchar>(i, j) = 255;
             } else
-            #pragma omp critical 
+            #ifdef WITH_OPENMP
+            #pragma omp critical
+            #endif
             {
                 this->background.at<Vec3b>(i, j) = this->frame.at<Vec3b>(i, j);
             }
@@ -127,7 +155,9 @@ void AGMM::shadowDetection()
     cvtColor(this->background, hsvBackground, COLOR_BGR2HSV);
     shadowMask = Mat::zeros(this->rows, this->cols, CV_8U);
 
+    #ifdef WITH_OPENMP
     #pragma omp parallel for collapse(2)
+    #endif
     for (unsigned int i = 0; i < this->rows; i++)
     {
         for (unsigned int j = 0; j < this->cols; j++)
@@ -162,7 +192,9 @@ void AGMM::shadowDetection()
 
                 if (hueDifferenceSum / windowArea < this->SD_hueThreshold && saturationDifferenceSum / windowArea < this->SD_saturationThreshold)
                 {
+                    #ifdef WITH_OPENMP
                     #pragma omp critical
+                    #endif
                     {
                         shadowMask.at<uchar>(i, j) = 255;
                     }
@@ -172,7 +204,9 @@ void AGMM::shadowDetection()
     }
 
     this->shadowMask = shadowMask;
+    #ifdef WITH_OPENMP
     #pragma omp critical
+    #endif
     {
         this-> finalMask = this->finalMask - shadowMask;
     }
@@ -212,15 +246,15 @@ void AGMM::objectExtraction()
 void AGMM::objectTypeClassification() {
     Mat workingFrame;
     cvtColor(this->frame, workingFrame, COLOR_BGR2GRAY);
-    GaussianBlur(workingFrame, workingFrame, Size(3, 3), 0, 0);
+    GaussianBlur(workingFrame, workingFrame, Size(5, 5), 0);
 
     for (unsigned int i = 0; i < this->rows; i++) {
         for (unsigned int j = 0; j < this->cols; j++) {
             double pixel = static_cast<double>(workingFrame.at<uchar>(i, j));
             // if pixel is not white in objectMask
-            if (this->objectMask.at<uchar>(i,j) == 0) this->mixtures[i * this->cols + j].updateEta(0, pixel);
-            else if (this->objectMask.at<uchar>(i,j) == 255 && this->shadowMask.at<uchar>(i,j) == 255) this->mixtures[i * this->cols + j].updateEta(1, pixel);
-            else (this->mixtures[i * this->cols + j].updateEta(3, pixel));
+            if (this->objectMask.at<uchar>(i,j) == 0) this->mixtures[i * this->cols + j].updateEta(0, pixel, this->debug);
+            else if (this->objectMask.at<uchar>(i,j) == 255 && this->shadowMask.at<uchar>(i,j) == 255) this->mixtures[i * this->cols + j].updateEta(1, pixel, this->debug);
+            else (this->mixtures[i * this->cols + j].updateEta(3, pixel, this->debug));
 
         }
     }

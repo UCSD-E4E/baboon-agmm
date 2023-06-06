@@ -9,6 +9,7 @@ class Mixture
 private:
     int numberOfGaussians;
 
+    int frameNumber = 0;
     double eta = .025;
     double alpha;
     double beta_b;
@@ -32,7 +33,7 @@ public:
 
     bool isForegroundPixel() const;
 
-    void updateEta(int O, double intensity);
+    void updateEta(int O, double intensity, bool debug);
 };
 
 #endif
