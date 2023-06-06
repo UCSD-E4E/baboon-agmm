@@ -16,6 +16,8 @@ using namespace std;
 class AGMM
 {
 private:
+    bool debug = false;
+
     // Background maintenance parameters
     double BM_numberOfGaussians = 100;
     double BM_alpha = 0.025;
@@ -38,8 +40,6 @@ private:
     Mat finalMask;
     Mat result;
 
-
-
     vector<Mixture> mixtures;
 
     void backgroundModelMaintenance();
@@ -57,6 +57,8 @@ public:
      * @param videoPath The path to the video file.
      */
     explicit AGMM(string videoPath);
+
+    explicit AGMM(string videoPath, bool debug);
 
     ~AGMM();
 
