@@ -4,9 +4,6 @@
 #include <opencv2/opencv.hpp>
 #include <random>
 
-using namespace cv;
-using namespace std;
-
 Mixture::Mixture(int numberOfGaussians, double alpha, double beta_b,
                  double beta_d, double beta_s, double beta_m)
 {
@@ -49,10 +46,10 @@ void Mixture::updateMixture(double intensity)
 {
     // Model matching
     // M_{t,x,n} = 0, for some n = 1, ..., N
-    vector<int> modelMatching(this->numberOfGaussians, 0);
+    std::vector<int> modelMatching(this->numberOfGaussians, 0);
     // d_{t,x,n} = infinity, for some n = 1, ..., N
-    vector<double> distances(this->numberOfGaussians,
-                             numeric_limits<double>::infinity());
+    std::vector<double> distances(this->numberOfGaussians,
+                             std::numeric_limits<double>::infinity());
 
     // for n = 1,...,N do
     for (int n = 0; n < this->numberOfGaussians; n++)
@@ -72,7 +69,7 @@ void Mixture::updateMixture(double intensity)
         distances.begin(), min_element(distances.begin(), distances.end()));
 
     // if d_{t,x,l(t,x)} != inf then M_{t,x,l(t,x)} = 1 else l(t,x) = 0
-    if (distances[currentGaussianIndex] != numeric_limits<double>::infinity())
+    if (distances[currentGaussianIndex] != std::numeric_limits<double>::infinity())
     {
         modelMatching[currentGaussianIndex] = 1;
     }
@@ -145,7 +142,7 @@ void Mixture::updateMixture(double intensity)
 
     if (sumOfWeights == 0)
     {
-        throw runtime_error("sumOfWeights is zero, cannot divide by zero");
+        throw std::runtime_error("sumOfWeights is zero, cannot divide by zero");
     }
     else
     {

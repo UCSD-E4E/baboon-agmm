@@ -19,21 +19,26 @@ private:
 
     double calculateProbablility(double intensity, double mean, double variance);
 
-public:
     std::vector<double> etas;
     std::vector<Gaussian> gaussians;
 
-    Mixture(int numberOfGaussians, double alpha, double beta_b, double beta_s, double beta_sf, double beta_mf);
+public:
+    Mixture(int numberOfGaussians, double alpha, double beta_b, double beta_s,
+            double beta_sf, double beta_mf);
 
     ~Mixture();
 
     void initializeMixture(double intensity);
-    
+
     void updateMixture(double intensity);
 
     bool isForegroundPixel() const;
 
     void updateEta(int O, double intensity, bool debug);
+
+    std::vector<double> getEtas() const { return this->etas; };
+
+    std::vector<Gaussian> getGaussians() const { return this->gaussians; };
 };
 
 #endif

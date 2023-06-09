@@ -11,11 +11,11 @@
 #endif
 
 #ifdef WITH_IMGUI
-#include <GLFW/glfw3.h> // Will drag system OpenGL headers
 #include "../third_party/imGUI/imgui.h"
 #include "../third_party/imGUI/imgui_impl_glfw.h"
 #include "../third_party/imGUI/imgui_impl_opengl3.h"
 #include "../third_party/imGUI/implot.h"
+#include <GLFW/glfw3.h> // Will drag system OpenGL headers
 #endif
 
 using namespace cv;
@@ -31,10 +31,10 @@ static void glfw_error_callback(int error, const char *description)
 
 // Main code
 int main(int argc, char **argv)
-{   
-    #ifdef WITH_OPENMP
+{
+#ifdef WITH_OPENMP
     omp_set_num_threads(4);
-    #endif
+#endif
 
     if (argc < 2)
     {
@@ -109,19 +109,31 @@ int main(int argc, char **argv)
 
         int frameCounter = 2;
 
-        Mat foregroundMask, foregroundMaskBGR, foregroundImage, frame;
+        Mat objectMask, objectMaskBGR, shadowMask, shadowMaskBGR, finalMask,
+            finalMaskBGR, frame;
 
-        tie(foregroundMask, foregroundImage, frame) = agmm.processNextFrame();
+        vector<Mat> frames = agmm.processNextFrame();
 
-        if (frame.empty())
+        // Check if frames array is empty
+        if (frames.empty())
         {
-            cout << "End of video" << endl;
-            exit(0);
+            cout << "Error: frames array is empty" << endl;
+            return -1;
         }
 
-        cvtColor(foregroundMask, foregroundMaskBGR, COLOR_GRAY2BGR);
+        objectMask = frames[0];
+        shadowMask = frames[1];
+        finalMask = frames[2];
+        frame = frames[3];
 
-        GLuint foregroundMaskBGRTextureID, foregroundImageTextureID, frameTextureID;
+        cvtColor(objectMask, objectMaskBGR, COLOR_GRAY2BGR);
+
+        cvtColor(shadowMask, shadowMaskBGR, COLOR_GRAY2BGR);
+
+        cvtColor(finalMask, finalMaskBGR, COLOR_GRAY2BGR);
+
+        GLuint objectMaskBGRTextureID, shadowMaskBGRTextureID,
+            finalMaskBGRTextureID, frameTextureID;
 
         auto generateTexture = [&](Mat &image, GLuint &textureID)
         {
@@ -138,8 +150,9 @@ int main(int argc, char **argv)
             glBindTexture(GL_TEXTURE_2D, 0);
         };
 
-        generateTexture(foregroundMaskBGR, foregroundMaskBGRTextureID);
-        generateTexture(foregroundImage, foregroundImageTextureID);
+        generateTexture(objectMaskBGR, objectMaskBGRTextureID);
+        generateTexture(shadowMaskBGR, shadowMaskBGRTextureID);
+        generateTexture(finalMaskBGR, finalMaskBGRTextureID);
         generateTexture(frame, frameTextureID);
 
         static bool isPlaying = false; // New variable to play/pause the video
@@ -175,18 +188,29 @@ int main(int argc, char **argv)
 
                 if (ImGui::Button("Next Frame"))
                 {
-                    tie(foregroundMask, foregroundImage, frame) = agmm.processNextFrame();
+                    vector<Mat> frames = agmm.processNextFrame();
 
-                    if (frame.empty())
+                    // Check if frames array is empty
+                    if (frames.empty())
                     {
-                        cout << "End of video" << endl;
-                        exit(0);
+                        cout << "Error: frames array is empty" << endl;
+                        return -1;
                     }
 
-                    cvtColor(foregroundMask, foregroundMaskBGR, COLOR_GRAY2BGR);
+                    objectMask = frames[0];
+                    shadowMask = frames[1];
+                    finalMask = frames[2];
+                    frame = frames[3];
 
-                    generateTexture(foregroundMaskBGR, foregroundMaskBGRTextureID);
-                    generateTexture(foregroundImage, foregroundImageTextureID);
+                    cvtColor(objectMask, objectMaskBGR, COLOR_GRAY2BGR);
+
+                    cvtColor(shadowMask, shadowMaskBGR, COLOR_GRAY2BGR);
+
+                    cvtColor(finalMask, finalMaskBGR, COLOR_GRAY2BGR);
+
+                    generateTexture(objectMaskBGR, objectMaskBGRTextureID);
+                    generateTexture(shadowMaskBGR, shadowMaskBGRTextureID);
+                    generateTexture(finalMaskBGR, finalMaskBGRTextureID);
                     generateTexture(frame, frameTextureID);
 
                     etas = agmm.getPixelEtas(pixelCoordinates[0], pixelCoordinates[1]);
@@ -210,18 +234,29 @@ int main(int argc, char **argv)
 
             if (isPlaying)
             {
-                tie(foregroundMask, foregroundImage, frame) = agmm.processNextFrame();
+                vector<Mat> frames = agmm.processNextFrame();
 
-                if (frame.empty())
+                // Check if frames array is empty
+                if (frames.empty())
                 {
-                    cout << "End of video" << endl;
-                    exit(0);
+                    cout << "Error: frames array is empty" << endl;
+                    return -1;
                 }
 
-                cvtColor(foregroundMask, foregroundMaskBGR, COLOR_GRAY2BGR);
+                objectMask = frames[0];
+                shadowMask = frames[1];
+                finalMask = frames[2];
+                frame = frames[3];
 
-                generateTexture(foregroundMaskBGR, foregroundMaskBGRTextureID);
-                generateTexture(foregroundImage, foregroundImageTextureID);
+                cvtColor(objectMask, objectMaskBGR, COLOR_GRAY2BGR);
+
+                cvtColor(shadowMask, shadowMaskBGR, COLOR_GRAY2BGR);
+
+                cvtColor(finalMask, finalMaskBGR, COLOR_GRAY2BGR);
+
+                generateTexture(objectMaskBGR, objectMaskBGRTextureID);
+                generateTexture(shadowMaskBGR, shadowMaskBGRTextureID);
+                generateTexture(finalMaskBGR, finalMaskBGRTextureID);
                 generateTexture(frame, frameTextureID);
 
                 etas = agmm.getPixelEtas(pixelCoordinates[0], pixelCoordinates[1]);
@@ -230,15 +265,17 @@ int main(int argc, char **argv)
                 frameCounter++;
             }
 
-            double widgetWidth = agmm.cols;
-            double widgetHeight = agmm.rows;
+            double widgetWidth = agmm.getCols();
+            double widgetHeight = agmm.getRows();
 
             // Display foregroundMaskBGRTextureID, foregroundImageTextureID,
             // frameTextureID
             ImGui::Begin("Background Subtraction");
-            ImGui::Image((void *)(intptr_t)foregroundMaskBGRTextureID,
+            ImGui::Image((void *)(intptr_t)objectMaskBGRTextureID,
                          ImVec2(widgetWidth, widgetHeight));
-            ImGui::Image((void *)(intptr_t)foregroundImageTextureID,
+            ImGui::Image((void *)(intptr_t)shadowMaskBGRTextureID,
+                         ImVec2(widgetWidth, widgetHeight));
+            ImGui::Image((void *)(intptr_t)finalMaskBGRTextureID,
                          ImVec2(widgetWidth, widgetHeight));
             ImGui::Image((void *)(intptr_t)frameTextureID,
                          ImVec2(widgetWidth, widgetHeight));
@@ -319,9 +356,6 @@ int main(int argc, char **argv)
         agmm.initializeModel();
         cout << "Model Initialized" << endl;
 
-        Mat frame, foregroundMask, foregroundMaskBGR, foregroundImage,
-            combinedFrame, resizedFrame;
-
         VideoWriter videoWriter;
         bool isVideoWriterInitialized = false;
 
@@ -330,7 +364,11 @@ int main(int argc, char **argv)
 
         while (true)
         {
-            tie(foregroundMask, foregroundImage, frame) = agmm.processNextFrame();
+            vector<Mat> frames = agmm.processNextFrame();
+            Mat objectMask = frames[0];
+            Mat shadowMask = frames[1];
+            Mat finalMask = frames[2];
+            Mat frame = frames[3];
 
             frameCount++;
 
@@ -339,9 +377,26 @@ int main(int argc, char **argv)
                 break;
             }
 
-            cvtColor(foregroundMask, foregroundMaskBGR, COLOR_GRAY2BGR);
-            hconcat(frame, foregroundMaskBGR, combinedFrame);
-            resize(combinedFrame, resizedFrame, Size(), 0.5, 0.5, INTER_LINEAR);
+            Mat objectMaskBGR;
+            cvtColor(objectMask, objectMaskBGR, COLOR_GRAY2BGR);
+
+            Mat shadowMaskBGR;
+            cvtColor(shadowMask, shadowMaskBGR, COLOR_GRAY2BGR);
+
+            Mat finalMaskBGR;
+            cvtColor(finalMask, finalMaskBGR, COLOR_GRAY2BGR);
+
+            // Make 2x2 grid of images.
+            Mat combinedFrame;
+            Mat combinedFrameTop;
+            Mat combinedFrameBottom;
+            hconcat(frame, objectMaskBGR, combinedFrameTop);
+            hconcat(shadowMaskBGR, finalMaskBGR, combinedFrameBottom);
+            vconcat(combinedFrameTop, combinedFrameBottom, combinedFrame);
+
+            Mat combinedFrameResized;
+            resize(combinedFrame, combinedFrameResized, Size(), 0.5, 0.5,
+                   INTER_LINEAR);
 
             if (!isVideoWriterInitialized)
             {
@@ -362,8 +417,14 @@ int main(int argc, char **argv)
                 // Try to initialize VideoWriter with each codec
                 for (const auto &codec : codecs)
                 {
-                    if (videoWriter.open("output.avi", codec, 30, resizedFrame.size(),
-                                         true))
+                    if (videoWriter.open("output.avi", codec, agmm.getFPS(),
+                                         combinedFrameResized.size(), true))
+                    {
+                        codecFound = true;
+                        break;
+                    }
+                    else if (videoWriter.open("output.mp4", codec, agmm.getFPS(),
+                                              combinedFrameResized.size(), true))
                     {
                         codecFound = true;
                         break;
@@ -377,12 +438,12 @@ int main(int argc, char **argv)
                 isVideoWriterInitialized = true;
             }
 
-            videoWriter.write(combinedFrame);
+            videoWriter.write(combinedFrameResized);
             cout << "Frame Count: " << frameCount << endl;
 
             if (record)
             {
-                imshow("Frame", resizedFrame);
+                imshow("Frame", combinedFrameResized);
                 if (waitKey(1) == 27)
                 {
                     break;

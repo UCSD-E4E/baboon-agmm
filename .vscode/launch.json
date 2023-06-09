@@ -8,7 +8,7 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/bin/BackgroundSubtraction",
+            "program": "${workspaceRoot}/bin/Main",
             "args": ["/home/tylerflar/Desktop/Baboons-On-The-Move/baboon-agmm/videos/16x16.mp4"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

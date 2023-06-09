@@ -9,7 +9,8 @@ private:
     double weight;
 
 public:
-    Gaussian(double mean, double variance, double weight) : mean(mean), variance(variance), weight(weight) {}
+    Gaussian(double mean, double variance, double weight)
+        : mean(mean), variance(variance), weight(weight) {}
 
     ~Gaussian() = default;
 
