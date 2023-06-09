@@ -158,6 +158,9 @@ void AGMM::shadowDetection()
 {
     cv::Mat background(this->rows, this->cols, CV_64FC1);
 
+    #ifdef WITH_OPENMP
+    #pragma omp parallel for collapse(2)
+    #endif
     for (unsigned int i = 0; i < this->rows; i++)
     {
         for (unsigned int j = 0; j < this->cols; j++)

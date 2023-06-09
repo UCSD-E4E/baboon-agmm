@@ -417,13 +417,7 @@ int main(int argc, char **argv)
                 // Try to initialize VideoWriter with each codec
                 for (const auto &codec : codecs)
                 {
-                    if (videoWriter.open("output.avi", codec, agmm.getFPS(),
-                                         combinedFrameResized.size(), true))
-                    {
-                        codecFound = true;
-                        break;
-                    }
-                    else if (videoWriter.open("output.mp4", codec, agmm.getFPS(),
+                    if (videoWriter.open("output.mp4", codec, agmm.getFPS(),
                                               combinedFrameResized.size(), true))
                     {
                         codecFound = true;
