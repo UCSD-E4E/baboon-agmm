@@ -400,25 +400,30 @@ int main(int argc, char **argv)
 
             if (!isVideoWriterInitialized)
             {
-                // List of preferred codecs
-                vector<int> codecs = {
-                    VideoWriter::fourcc('x', 'v', 'i', 'd'), // XVID MPEG-4
-                    VideoWriter::fourcc('M', 'J', 'P', 'G'), // Motion JPEG
-                    VideoWriter::fourcc('M', 'P', '4', '2'), // MPEG-4.2
-                    VideoWriter::fourcc('D', 'I', 'V', '3'), // MPEG-4.3
-                    VideoWriter::fourcc('D', 'I', 'V', 'X'), // MPEG-4
-                    VideoWriter::fourcc('X', '2', '6', '4'), // H.264
-                    VideoWriter::fourcc('H', 'E', 'V', 'C'), // H.265
-                    -1                                       // Default
+                // List of preferred codec and file type pairs
+                std::vector<std::pair<int, std::string>> codecFileTypePairs = {
+                    {cv::VideoWriter::fourcc('X', '2', '6', '4'), "mp4"}, // H.264, MP4
+                    {cv::VideoWriter::fourcc('x', 'v', 'i', 'd'),
+                     "mp4"},                                              // XVID MPEG-4, MP4
+                    {cv::VideoWriter::fourcc('H', 'E', 'V', 'C'), "mp4"}, // H.265, MP4
+                    {cv::VideoWriter::fourcc('M', 'J', 'P', 'G'),
+                     "avi"}, // Motion-JPEG, AVI
+                    {cv::VideoWriter::fourcc('D', 'I', 'V', 'X'),
+                     "avi"},                                              // DIVX MPEG-4, AVI
+                    {cv::VideoWriter::fourcc('H', '2', '6', '3'), "avi"}, // H.263, AVI
+                    {cv::VideoWriter::fourcc('F', 'L', 'V', '1'),
+                     "flv"}, // Flash Video, FLV
+                    {-1, ""} // Default (let OpenCV choose)
                 };
 
                 bool codecFound = false;
 
-                // Try to initialize VideoWriter with each codec
-                for (const auto &codec : codecs)
+                // Try to initialize VideoWriter with each codec and file type
+                for (const auto &codecFileTypePair : codecFileTypePairs)
                 {
-                    if (videoWriter.open("output.mp4", codec, agmm.getFPS(),
-                                              combinedFrameResized.size(), true))
+                    std::string filename = "output." + codecFileTypePair.second;
+                    if (videoWriter.open(filename, codecFileTypePair.first, agmm.getFPS(),
+                                         combinedFrameResized.size(), true))
                     {
                         codecFound = true;
                         break;
