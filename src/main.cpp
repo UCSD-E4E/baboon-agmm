@@ -365,17 +365,19 @@ int main(int argc, char **argv)
         while (true)
         {
             vector<Mat> frames = agmm.processNextFrame();
+            
+
+            frameCount++;
+
+            if (frames.empty())
+            {
+                break;
+            }
+
             Mat objectMask = frames[0];
             Mat shadowMask = frames[1];
             Mat finalMask = frames[2];
             Mat frame = frames[3];
-
-            frameCount++;
-
-            if (frame.empty())
-            {
-                break;
-            }
 
             Mat objectMaskBGR;
             cvtColor(objectMask, objectMaskBGR, COLOR_GRAY2BGR);
