@@ -38,29 +38,36 @@ int main(int argc, char **argv)
 
     if (argc < 2)
     {
-        cout << "Usage: BackgroundSubtraction <video_path> [-r|--record] "
-                "[-d|--debug]"
+        cout << "Usage: ./bin/Main <video_path> [-r|--record] "
+                "[-d|--debug] [-s|--disable-shadow]"
              << endl;
         return -1;
     }
 
     bool record = false;
     bool debug = false;
+    bool disableShadow = false;
 
-    map<char, function<void()>> options = {{'r', [&]()
-                                            { record = true; }},
-                                           {'d', [&]()
-                                            {
-                                                debug = true;
-                                                record = false;
-                                            }}};
+    map<char, function<void()>> options = {
+        {'r', [&]()
+         { record = true; }},
+        {'d',
+         [&]()
+         {
+             debug = true;
+             record = false;
+         }},
+        {'s', [&]()
+         { disableShadow = true; }}};
 
-    static struct option long_options[] = {{"record", no_argument, NULL, 'r'},
-                                           {"debug", no_argument, NULL, 'd'},
-                                           {NULL, 0, NULL, 0}};
+    static struct option long_options[] = {
+        {"record", no_argument, NULL, 'r'},
+        {"debug", no_argument, NULL, 'd'},
+        {"disable-shadow", no_argument, NULL, 's'},
+        {NULL, 0, NULL, 0}};
 
     int option_index = 0;
-    while ((option_index = getopt_long(argc, argv, "rd", long_options, NULL)) !=
+    while ((option_index = getopt_long(argc, argv, "rds", long_options, NULL)) !=
            -1)
     {
         if (options.find(option_index) != options.end())
@@ -104,7 +111,7 @@ int main(int argc, char **argv)
         ImGui_ImplOpenGL3_Init(glsl_version);
 
         // Our state
-        AGMM agmm(argv[optind]);
+        AGMM agmm(argv[optind], debug, disableShadow);
         agmm.initializeModel();
 
         int frameCounter = 2;
@@ -351,7 +358,7 @@ int main(int argc, char **argv)
     else
 #endif
     {
-        AGMM agmm(argv[optind]);
+        AGMM agmm(argv[optind], debug, disableShadow);
         cout << "Recording" << endl;
         agmm.initializeModel();
         cout << "Model Initialized" << endl;
@@ -365,7 +372,6 @@ int main(int argc, char **argv)
         while (true)
         {
             vector<Mat> frames = agmm.processNextFrame();
-            
 
             frameCount++;
 
