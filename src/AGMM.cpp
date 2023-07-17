@@ -13,6 +13,15 @@
 #include <omp.h>
 #endif
 
+const int BlurSize = 5;
+
+const int BM_numberOfGaussians = 100;
+const double BM_alpha = 0.025;
+const double BM_beta_b = 0.01;
+const double BM_beta_d = 1.0 / 100.0;
+const double BM_beta_s = 1.0 / 900.0;
+const double BM_beta_m = 1.0 / 6000.0;
+
 AGMM::AGMM(std::string videoPath)
 {
     this->cap = cv::VideoCapture(videoPath);
@@ -30,9 +39,10 @@ AGMM::AGMM(std::string videoPath)
     this->fps = cap.get(cv::CAP_PROP_FPS);
 }
 
-AGMM::AGMM(std::string videoPath, bool debug)
+AGMM::AGMM(std::string videoPath, bool debug, bool disableShadow)
 {
     this->debug = debug;
+    this->disableShadow = disableShadow;
     this->cap = cv::VideoCapture(videoPath);
 
     // If video cannot be opened, error and deconstruct AGMM
@@ -56,7 +66,7 @@ void AGMM::initializeModel()
 
     cv::Mat workingFrame;
     cvtColor(this->frame, workingFrame, cv::COLOR_BGR2GRAY);
-    GaussianBlur(workingFrame, workingFrame, cv::Size(5, 5), 0);
+    GaussianBlur(workingFrame, workingFrame, cv::Size(BlurSize, BlurSize), 0);
 
     // Give each mixture a vector of pixels
     for (unsigned int i = 0; i < this->rows; i++)
@@ -64,9 +74,8 @@ void AGMM::initializeModel()
         for (unsigned int j = 0; j < this->cols; j++)
         {
             double intensity = static_cast<double>(workingFrame.at<uchar>(i, j));
-            Mixture mixture =
-                Mixture(this->BM_numberOfGaussians, this->BM_alpha, this->BM_beta_b,
-                        this->BM_beta_d, this->BM_beta_s, this->BM_beta_m);
+            Mixture mixture = Mixture(BM_numberOfGaussians, BM_alpha, BM_beta_b,
+                                      BM_beta_d, BM_beta_s, BM_beta_m);
             this->mixtures.push_back(mixture);
             mixtures[i * this->cols + j].initializeMixture(intensity);
         }
@@ -91,7 +100,9 @@ std::vector<cv::Mat> AGMM::processNextFrame()
 
     this->backgroundModelMaintenance();
     this->foregroundPixelIdentification();
-    this->shadowDetection();
+    if (!this->disableShadow)
+        this->shadowDetection();
+    this->finalMask = this->objectMask - this->shadowMask;
     this->objectExtraction();
     this->objectTypeClassification();
     cv::bitwise_and(this->frame, this->frame, this->result, this->finalMask);
@@ -109,7 +120,7 @@ void AGMM::backgroundModelMaintenance()
 {
     cv::Mat workingFrame;
     cvtColor(this->frame, workingFrame, cv::COLOR_BGR2GRAY);
-    GaussianBlur(workingFrame, workingFrame, cv::Size(5, 5), 0);
+    GaussianBlur(workingFrame, workingFrame, cv::Size(BlurSize, BlurSize), 0);
 
 #ifdef WITH_OPENMP
 #pragma omp parallel for collapse(2)
@@ -158,9 +169,9 @@ void AGMM::shadowDetection()
 {
     cv::Mat background(this->rows, this->cols, CV_64FC1);
 
-    #ifdef WITH_OPENMP
-    #pragma omp parallel for collapse(2)
-    #endif
+#ifdef WITH_OPENMP
+#pragma omp parallel for collapse(2)
+#endif
     for (unsigned int i = 0; i < this->rows; i++)
     {
         for (unsigned int j = 0; j < this->cols; j++)
@@ -183,7 +194,6 @@ void AGMM::shadowDetection()
         }
     }
 
-    
     assert(background.size() == this->frame.size());
     cv::Mat grayFrame;
     if (this->frame.channels() == 3)
@@ -315,7 +325,6 @@ void AGMM::shadowDetection()
 
     // Update the final mask
     this->shadowMask = output;
-    this->finalMask = this->objectMask - this->shadowMask;
 }
 
 void AGMM::objectExtraction()
@@ -359,7 +368,7 @@ void AGMM::objectTypeClassification()
 {
     cv::Mat workingFrame;
     cvtColor(this->frame, workingFrame, cv::COLOR_BGR2GRAY);
-    GaussianBlur(workingFrame, workingFrame, cv::Size(5, 5), 0);
+    GaussianBlur(workingFrame, workingFrame, cv::Size(BlurSize, BlurSize), 0);
 
     for (unsigned int i = 0; i < this->rows; i++)
     {

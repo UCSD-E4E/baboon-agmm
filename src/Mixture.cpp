@@ -4,6 +4,8 @@
 #include <opencv2/opencv.hpp>
 #include <random>
 
+const double weightThreshold = .24;
+
 Mixture::Mixture(int numberOfGaussians, double alpha, double beta_b,
                  double beta_d, double beta_s, double beta_m)
 {
@@ -49,7 +51,7 @@ void Mixture::updateMixture(double intensity)
     std::vector<int> modelMatching(this->numberOfGaussians, 0);
     // d_{t,x,n} = infinity, for some n = 1, ..., N
     std::vector<double> distances(this->numberOfGaussians,
-                             std::numeric_limits<double>::infinity());
+                                  std::numeric_limits<double>::infinity());
 
     // for n = 1,...,N do
     for (int n = 0; n < this->numberOfGaussians; n++)
@@ -69,7 +71,8 @@ void Mixture::updateMixture(double intensity)
         distances.begin(), min_element(distances.begin(), distances.end()));
 
     // if d_{t,x,l(t,x)} != inf then M_{t,x,l(t,x)} = 1 else l(t,x) = 0
-    if (distances[currentGaussianIndex] != std::numeric_limits<double>::infinity())
+    if (distances[currentGaussianIndex] !=
+        std::numeric_limits<double>::infinity())
     {
         modelMatching[currentGaussianIndex] = 1;
     }
@@ -165,7 +168,7 @@ bool Mixture::isForegroundPixel() const
                              {
                                  return g1.getWeight() < g2.getWeight();
                              }));
-    return this->gaussians[currentGaussianIndex].getWeight() < .24;
+    return this->gaussians[currentGaussianIndex].getWeight() < weightThreshold;
 }
 
 void Mixture::updateEta(int O, double intensity, bool debug)

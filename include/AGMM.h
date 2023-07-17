@@ -15,23 +15,10 @@ class AGMM
 {
 private:
     bool debug = false;
+    bool disableShadow = false;
     unsigned int rows;
     unsigned int cols;
     unsigned int fps;
-
-    // Background maintenance parameters
-    double BM_numberOfGaussians = 100;
-    double BM_alpha = 0.025;
-    double BM_beta_b = 0.01;
-    double BM_beta_d = 1.0 / 100.0;
-    double BM_beta_s = 1.0 / 900.0;
-    double BM_beta_m = 1.0 / 6000.0;
-
-    // Shadow detection parameters
-    double SD_hueThreshold = 62;
-    double SD_saturationThreshold = 93;
-    double SD_valueUpperbound = 1;
-    double SD_valueLowerbound = 0.6;
 
     cv::VideoCapture cap;
     cv::Mat frame;
@@ -55,7 +42,7 @@ public:
      */
     explicit AGMM(std::string videoPath);
 
-    explicit AGMM(std::string videoPath, bool debug);
+    explicit AGMM(std::string videoPath, bool debug, bool disableShadow);
 
     ~AGMM();
 

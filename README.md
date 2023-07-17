@@ -38,4 +38,4 @@ Baboons-AGMM is a C++ implementation of the Adaptive Gaussian Mixture Model (AGM
 After building the project, you can run the program with a path to a video file as an argument:
 
 ```bash
-./bin/Main path_to_your_video.mp4
+./bin/Main <video_path> [-r|--record] [-d|--debug] [-s|--disable-shadow]
