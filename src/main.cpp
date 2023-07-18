@@ -33,7 +33,7 @@ static void glfw_error_callback(int error, const char *description)
 int main(int argc, char **argv)
 {
 #ifdef WITH_OPENMP
-    omp_set_num_threads(8);
+    omp_set_num_threads(4);
 #endif
 
     if (argc < 2)
