@@ -13,7 +13,7 @@
 #include <omp.h>
 #endif
 
-const int BlurSize = 5;
+const int BlurSize = 3;
 
 const int BM_numberOfGaussians = 100;
 const double BM_alpha = 0.025;

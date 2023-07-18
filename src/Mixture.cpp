@@ -173,12 +173,6 @@ bool Mixture::isForegroundPixel() const
 
 void Mixture::updateEta(int O, double intensity, bool debug)
 {
-    // Use case 0 for the first 100 frames
-    if (this->frameNumber < 100)
-    {
-        O = 0;
-    }
-
     // eta_{t,x}(Beta) =
     switch (O)
     {

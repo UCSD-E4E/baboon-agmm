@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/bin/Main",
-            "args": ["/home/tylerflar/Desktop/Baboons-On-The-Move/baboon-agmm/videos/16x16.mp4"],
+            "args": ["/home/tylerflar/Desktop/Baboons-On-The-Move/baboon-agmm/videos/45degree_60m_troop_subs.mov -r -s"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
