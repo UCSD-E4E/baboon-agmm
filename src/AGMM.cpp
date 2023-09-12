@@ -167,164 +167,222 @@ double medianMat(cv::Mat Input)
 
 void AGMM::shadowDetection()
 {
-    cv::Mat background(this->rows, this->cols, CV_64FC1);
+    cv::Mat workingFrame;
+    cvtColor(this->frame, workingFrame, cv::COLOR_BGR2GRAY);
+    GaussianBlur(workingFrame, workingFrame, cv::Size(BlurSize, BlurSize), 0);
+    
+    // Reference Image
+    cv::Mat reference = cv::Mat::zeros(this->rows, this->cols, CV_8U);
 
-#ifdef WITH_OPENMP
-#pragma omp parallel for collapse(2)
-#endif
-    for (unsigned int i = 0; i < this->rows; i++)
-    {
-        for (unsigned int j = 0; j < this->cols; j++)
-        {
-            std::vector<Gaussian> gaussians =
-                this->mixtures[i * this->cols + j].getGaussians();
-
-            // Extract the mean of each Gaussian.
-            std::vector<double> means(gaussians.size());
-            transform(gaussians.begin(), gaussians.end(), means.begin(),
-                      [](const Gaussian &g)
-                      { return g.getMean(); });
-
-            // Sort the means.
-            sort(means.begin(), means.end());
-
-            // Compute the median and set it as the background pixel intensity.
-            double median = means[means.size() / 2];
-            background.at<double>(i, j) = median;
+    for (unsigned int i = 0; i < this->rows; i++) {
+        for (unsigned int j = 0; j < this->cols; j++) {
+            std::vector<Gaussian> gaussians = 
+                    this->mixtures[i * this->cols + j].getGaussians();
+            double average = 0;
+            for(unsigned int i = 0; i < 100; i++)
+            {
+                double average += (gaussians[i].getMean() * gaussians[i].getWeight());
+            }
+            reference.at<double>(i, j) = average;
         }
     }
 
-    assert(background.size() == this->frame.size());
-    cv::Mat grayFrame;
-    if (this->frame.channels() == 3)
-        cvtColor(this->frame, grayFrame, cv::COLOR_BGR2GRAY);
-    else
-        grayFrame = this->frame.clone();
-
-    // Convert grayFrame to double precision.
-    grayFrame.convertTo(grayFrame, CV_64FC1);
-
-    // Compute the absolute difference image
+    // Threshold Image (frame differencing operation)
+    // L-filters (linear combination of the ordered samples of the image sequence)
     cv::Mat diffImage;
-    cv::absdiff(grayFrame, background, diffImage);
+    cv::absdiff(reference, workingFrame, diffImage);
 
-    // Compute the median of the difference image
     double median = medianMat(diffImage);
-
-    // Compute the Median Absolute Deviation (MAD)
     cv::Mat madImage;
-    absdiff(diffImage - median,
-            cv::Mat::zeros(diffImage.size(), diffImage.type()), madImage);
+    absdiff(diffImage - median, madImage);
     double mad = medianMat(madImage);
-
-    // Compute the threshold
     double threshold = median + 3 * 1.4826 * mad;
-
-    // Threshold the difference image
     cv::Mat thresholdedImage;
     cv::threshold(diffImage, thresholdedImage, threshold, 255, cv::THRESH_BINARY);
 
-    // Copy the thresholded image to create an output image
+    // Connectivity preserving thresholding
     cv::Mat output = thresholdedImage.clone();
-
-    // Convert thresholded image to 8-bit
     cv::Mat thresholdedImage8U;
     thresholdedImage.convertTo(thresholdedImage8U, CV_8U);
-
-    // Connected Components compulation
     cv::Mat labels;
     int num_objects = connectedComponents(thresholdedImage8U, labels, 8, CV_32S);
+    
+    // Thresholding with hysteresis
 
-    // Array to hold the number of pixels in each component
-    std::vector<int> component_sizes(num_objects, 0);
-
-    // Iterate over the labels to count the number of pixels in each component
-    for (int i = 0; i < labels.rows; i++)
-    {
-        for (int j = 0; j < labels.cols; j++)
-        {
-            component_sizes[labels.at<int>(i, j)]++;
+    // Region Growing (single pass neighbourhood connectivity algorithm)
+    // Gain calculation and checking
+    for (unsigned int i = 0; i < this->rows; i++) {
+        for (unsigned int j = 0; j < this->cols; j++) {
+            double gain = reference.at<double>(i, j) 
+                    / workingFrame.at<double>(i, j)
         }
     }
 
-    // Minimum size for the component to be kept
-    const int min_size = 2;
+    // Merging regions
 
-    // Iterate over the image to update the output image
-    for (int i = 0; i < labels.rows; i++)
-    {
-        for (int j = 0; j < labels.cols; j++)
-        {
-            // If the component is too small, set the pixel to 0
-            if (component_sizes[labels.at<int>(i, j)] < min_size)
-            {
-                output.at<uchar>(i, j) = 0;
-            }
-        }
-    }
+    
 
-    // Override the thresholded image with the updated output image
-    thresholdedImage = output;
 
-    // 2-level hysteresis thresholding
-    cv::Mat lowerThresholdedImage, higherThresholdedImage;
-    double lowerThreshold = threshold / 2.0;
-    double higherThreshold = threshold;
-    cv::threshold(diffImage, lowerThresholdedImage, lowerThreshold, 255,
-                  cv::THRESH_BINARY);
-    cv::threshold(diffImage, higherThresholdedImage, higherThreshold, 255,
-                  cv::THRESH_BINARY);
 
-    // Dilation to determine connectivity
-    cv::Mat dilatedHigherThresholdedImage;
-    cv::dilate(higherThresholdedImage, dilatedHigherThresholdedImage, cv::Mat());
-    cv::bitwise_and(dilatedHigherThresholdedImage, lowerThresholdedImage, output);
 
-    // Shadow detection
-    cv::Mat gainImage = grayFrame / background;
-    cv::Mat shadowMask = (gainImage < 1.0);
+//     cv::Mat background(this->rows, this->cols, CV_64FC1);
 
-    cv::Mat shadowMask8U;
-    shadowMask.convertTo(shadowMask8U, CV_8U);
+// #ifdef WITH_OPENMP
+// #pragma omp parallel for collapse(2)
+// #endif
+//     for (unsigned int i = 0; i < this->rows; i++)
+//     {
+//         for (unsigned int j = 0; j < this->cols; j++)
+//         {
+//             std::vector<Gaussian> gaussians =
+//                 this->mixtures[i * this->cols + j].getGaussians();
 
-    cv::Mat regionLabels;
-    int numRegions = connectedComponents(shadowMask8U, regionLabels, 8, CV_32S);
+//             // Extract the mean of each Gaussian.
+//             std::vector<double> means(gaussians.size());
+//             transform(gaussians.begin(), gaussians.end(), means.begin(),
+//                       [](const Gaussian &g)
+//                       { return g.getMean(); });
 
-    // Array to hold the average gain in each region
-    std::vector<double> regionGains(numRegions, 0.0);
+//             // Sort the means.
+//             sort(means.begin(), means.end());
 
-    // Iterate over the labels to compute the average gain in each region
-    for (int i = 0; i < regionLabels.rows; i++)
-    {
-        for (int j = 0; j < regionLabels.cols; j++)
-        {
-            regionGains[regionLabels.at<int>(i, j)] += gainImage.at<double>(i, j);
-        }
-    }
+//             // Compute the median and set it as the background pixel intensity.
+//             double median = means[means.size() / 2];
+//             background.at<double>(i, j) = median;
+//         }
+//     }
 
-    // Override the theshold image with the shadow detection result
-    for (int i = 0; i < regionLabels.rows; i++)
-    {
-        for (int j = 0; j < regionLabels.cols; j++)
-        {
-            if (regionGains[regionLabels.at<int>(i, j)] /
-                    component_sizes[regionLabels.at<int>(i, j)] <
-                0.5)
-            {
-                output.at<uchar>(i, j) = 0;
-            }
-            else
-            {
-                output.at<uchar>(i, j) = 255;
-            }
-        }
-    }
+//     assert(background.size() == this->frame.size());
+//     cv::Mat grayFrame;
+//     if (this->frame.channels() == 3)
+//         cvtColor(this->frame, grayFrame, cv::COLOR_BGR2GRAY);
+//     else
+//         grayFrame = this->frame.clone();
 
-    // Convert output to a binary image 8UC1
-    output.convertTo(output, CV_8UC1);
+//     // Convert grayFrame to double precision.
+//     grayFrame.convertTo(grayFrame, CV_64FC1);
 
-    // Update the final mask
-    this->shadowMask = output;
+//     // Compute the absolute difference image
+//     cv::Mat diffImage;
+//     cv::absdiff(grayFrame, background, diffImage);
+
+//     // Compute the median of the difference image
+//     double median = medianMat(diffImage);
+
+//     // Compute the Median Absolute Deviation (MAD)
+//     cv::Mat madImage;
+//     absdiff(diffImage - median,
+//             cv::Mat::zeros(diffImage.size(), diffImage.type()), madImage);
+//     double mad = medianMat(madImage);
+
+//     // Compute the threshold
+//     double threshold = median + 3 * 1.4826 * mad;
+
+//     // Threshold the difference image
+//     cv::Mat thresholdedImage;
+//     cv::threshold(diffImage, thresholdedImage, threshold, 255, cv::THRESH_BINARY);
+
+//     // Copy the thresholded image to create an output image
+//     cv::Mat output = thresholdedImage.clone();
+
+//     // Convert thresholded image to 8-bit
+//     cv::Mat thresholdedImage8U;
+//     thresholdedImage.convertTo(thresholdedImage8U, CV_8U);
+
+//     // Connected Components compulation
+//     cv::Mat labels;
+//     int num_objects = connectedComponents(thresholdedImage8U, labels, 8, CV_32S);
+
+//     // Array to hold the number of pixels in each component
+//     std::vector<int> component_sizes(num_objects, 0);
+
+//     // Iterate over the labels to count the number of pixels in each component
+//     for (int i = 0; i < labels.rows; i++)
+//     {
+//         for (int j = 0; j < labels.cols; j++)
+//         {
+//             component_sizes[labels.at<int>(i, j)]++;
+//         }
+//     }
+
+//     // Minimum size for the component to be kept
+//     const int min_size = 2;
+
+//     // Iterate over the image to update the output image
+//     for (int i = 0; i < labels.rows; i++)
+//     {
+//         for (int j = 0; j < labels.cols; j++)
+//         {
+//             // If the component is too small, set the pixel to 0
+//             if (component_sizes[labels.at<int>(i, j)] < min_size)
+//             {
+//                 output.at<uchar>(i, j) = 0;
+//             }
+//         }
+//     }
+
+//     // Override the thresholded image with the updated output image
+//     thresholdedImage = output;
+
+//     // 2-level hysteresis thresholding
+//     cv::Mat lowerThresholdedImage, higherThresholdedImage;
+//     double lowerThreshold = threshold / 2.0;
+//     double higherThreshold = threshold;
+//     cv::threshold(diffImage, lowerThresholdedImage, lowerThreshold, 255,
+//                   cv::THRESH_BINARY);
+//     cv::threshold(diffImage, higherThresholdedImage, higherThreshold, 255,
+//                   cv::THRESH_BINARY);
+
+//     // Dilation to determine connectivity
+//     cv::Mat dilatedHigherThresholdedImage;
+//     cv::dilate(higherThresholdedImage, dilatedHigherThresholdedImage, cv::Mat());
+//     cv::bitwise_and(dilatedHigherThresholdedImage, lowerThresholdedImage, output);
+
+//     // Shadow detection
+//     cv::Mat gainImage = grayFrame / background;
+//     cv::Mat shadowMask = (gainImage < 1.0);
+
+//     cv::Mat shadowMask8U;
+//     shadowMask.convertTo(shadowMask8U, CV_8U);
+
+//     cv::Mat regionLabels;
+//     int numRegions = connectedComponents(shadowMask8U, regionLabels, 8, CV_32S);
+
+//     // Array to hold the average gain in each region
+//     std::vector<double> regionGains(numRegions, 0.0);
+
+//     // Iterate over the labels to compute the average gain in each region
+//     for (int i = 0; i < regionLabels.rows; i++)
+//     {
+//         for (int j = 0; j < regionLabels.cols; j++)
+//         {
+//             regionGains[regionLabels.at<int>(i, j)] += gainImage.at<double>(i, j);
+//         }
+//     }
+
+//     // Override the theshold image with the shadow detection result
+//     for (int i = 0; i < regionLabels.rows; i++)
+//     {
+//         for (int j = 0; j < regionLabels.cols; j++)
+//         {
+//             if (regionGains[regionLabels.at<int>(i, j)] /
+//                     component_sizes[regionLabels.at<int>(i, j)] <
+//                 0.5)
+//             {
+//                 output.at<uchar>(i, j) = 0;
+//             }
+//             else
+//             {
+//                 output.at<uchar>(i, j) = 255;
+//             }
+//         }
+//     }
+
+//     // Convert output to a binary image 8UC1
+//     output.convertTo(output, CV_8UC1);
+
+//     // Update the final mask
+//     this->shadowMask = output;
 }
 
 void AGMM::objectExtraction()
