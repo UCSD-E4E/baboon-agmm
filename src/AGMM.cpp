@@ -173,7 +173,8 @@ void AGMM::shadowDetection()
     
     // Reference Image
     cv::Mat reference = cv::Mat::zeros(this->rows, this->cols, CV_8U);
-
+    this->shadowMask = reference;
+    
     for (unsigned int i = 0; i < this->rows; i++) {
         for (unsigned int j = 0; j < this->cols; j++) {
             std::vector<Gaussian> gaussians = 
@@ -181,20 +182,21 @@ void AGMM::shadowDetection()
             double average = 0;
             for(unsigned int i = 0; i < 100; i++)
             {
-                double average += (gaussians[i].getMean() * gaussians[i].getWeight());
+                average += (gaussians[i].getMean() * gaussians[i].getWeight());
             }
             reference.at<double>(i, j) = average;
         }
     }
+    
 
     // Threshold Image (frame differencing operation)
     // L-filters (linear combination of the ordered samples of the image sequence)
     cv::Mat diffImage;
-    cv::absdiff(reference, workingFrame, diffImage);
+    absdiff(reference, workingFrame, diffImage);
 
     double median = medianMat(diffImage);
     cv::Mat madImage;
-    absdiff(diffImage - median, madImage);
+    absdiff(diffImage - median, cv::Mat::zeros(diffImage.size(), diffImage.type()), madImage);
     double mad = medianMat(madImage);
     double threshold = median + 3 * 1.4826 * mad;
     cv::Mat thresholdedImage;
@@ -214,12 +216,18 @@ void AGMM::shadowDetection()
     for (unsigned int i = 0; i < this->rows; i++) {
         for (unsigned int j = 0; j < this->cols; j++) {
             double gain = reference.at<double>(i, j) 
-                    / workingFrame.at<double>(i, j)
+                    / workingFrame.at<double>(i, j);
         }
     }
 
     // Merging regions
+    
 
+    // Test
+    output.convertTo(output, CV_8UC3);
+
+    // Update the final mask
+    this->shadowMask = output;
     
 
 
@@ -380,6 +388,7 @@ void AGMM::shadowDetection()
 
 //     // Convert output to a binary image 8UC1
 //     output.convertTo(output, CV_8UC1);
+//     output.convertTo(output, CV_8UC3);
 
 //     // Update the final mask
 //     this->shadowMask = output;
