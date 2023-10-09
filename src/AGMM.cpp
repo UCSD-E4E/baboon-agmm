@@ -167,13 +167,16 @@ double medianMat(cv::Mat Input)
 
 void AGMM::shadowDetection()
 {
+    cv::Mat img(this->rows, this->cols, CV_8UC1, 200);
+    this->shadowMask = img;
     cv::Mat workingFrame;
     cvtColor(this->frame, workingFrame, cv::COLOR_BGR2GRAY);
     GaussianBlur(workingFrame, workingFrame, cv::Size(BlurSize, BlurSize), 0);
     
+
     // Reference Image
     cv::Mat reference = cv::Mat::zeros(this->rows, this->cols, CV_8U);
-    this->shadowMask = reference;
+    
     
     for (unsigned int i = 0; i < this->rows; i++) {
         for (unsigned int j = 0; j < this->cols; j++) {
@@ -224,12 +227,17 @@ void AGMM::shadowDetection()
     
 
     // Test
+    // cd build
+    // PATH="/Applications/CMake.app/Contents/bin":"$PATH"
+    // cmake .. -DWITH_OPENMP=OFF -DWITH_IMGUI=OFF
+    // make
+    // ../bin/Main ../../../vid1.mp4 -r -s
+
     output.convertTo(output, CV_8UC3);
 
     // Update the final mask
     this->shadowMask = output;
     
-
 
 
 
@@ -388,7 +396,6 @@ void AGMM::shadowDetection()
 
 //     // Convert output to a binary image 8UC1
 //     output.convertTo(output, CV_8UC1);
-//     output.convertTo(output, CV_8UC3);
 
 //     // Update the final mask
 //     this->shadowMask = output;

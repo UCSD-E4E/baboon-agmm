@@ -389,6 +389,9 @@ int main(int argc, char **argv)
             cvtColor(objectMask, objectMaskBGR, COLOR_GRAY2BGR);
 
             Mat shadowMaskBGR;
+            // cv::Mat img(frames[1].rows, frames[2].cols, CV_8UC1, 100);
+            // cv::Mat shadowMask(frames[1].rows, frames[2].cols, CV_8UC1, 100);
+            // shadowMask.convertTo(shadowMask, CV_8UC1);
             cvtColor(shadowMask, shadowMaskBGR, COLOR_GRAY2BGR);
 
             Mat finalMaskBGR;
