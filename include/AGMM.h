@@ -4,54 +4,45 @@
 #include "Mixture.h"
 #include <opencv2/opencv.hpp>
 
-using namespace cv;
-using namespace std;
-
 /**
  * Class to implement the adaptive Gaussian mixture model (AGMM) algorithm.
  * The algorithm is described in the paper:
- * "Regularized Background Adaptation: A Novel Learning Rate Control Scheme for Gaussian Mixture Modeling"
- * by Horng-Horn Lin, Jen-Hui Chuang, and Tyng-Luh Liu.
+ * "Regularized Background Adaptation: A Novel Learning Rate Control Scheme for
+ * Gaussian Mixture Modeling" by Horng-Horn Lin, Jen-Hui Chuang, and Tyng-Luh
+ * Liu.
  */
 class AGMM
 {
 private:
-    // Background maintenance parameters
-    double BM_numberOfGaussians = 7;
-    double BM_alpha = 0.001;
-    double BM_backgroundRatio = 0.9;
-    double BM_upperboundVariance = 36;
-    double BM_lowerboundVariance = 8;
-
-    // Shadow detection parameters
-    double SD_hueThreshold = 62;
-    double SD_saturationThreshold = 93;
-    double SD_valueUpperbound = 1;
-    double SD_valueLowerbound = 0.6;
-
-    VideoCapture cap;
-    Mat frame;
-    Mat background;
-    Mat mask;
-    Mat result;
-
+    bool debug = false;
+    bool disableShadow = false;
     unsigned int rows;
     unsigned int cols;
-    unsigned int numberOfPixels;
+    unsigned int fps;
 
-    vector<Mixture> mixtures;
+    cv::VideoCapture cap;
+    cv::Mat frame;
+    cv::Mat objectMask;
+    cv::Mat shadowMask;
+    cv::Mat finalMask;
+    cv::Mat result;
 
-    void backgroundMaintenance();
+    std::vector<Mixture> mixtures;
+
+    void backgroundModelMaintenance();
+    void foregroundPixelIdentification();
     void shadowDetection();
-
-    Mat maskCleaner(Mat mask);
+    void objectExtraction();
+    void objectTypeClassification();
 
 public:
     /**
      * Initialize the AGMM algorithm.
      * @param videoPath The path to the video file.
      */
-    explicit AGMM(string videoPath);
+    explicit AGMM(std::string videoPath);
+
+    explicit AGMM(std::string videoPath, bool debug, bool disableShadow);
 
     ~AGMM();
 
@@ -59,13 +50,29 @@ public:
      * Initialize the model.
      * @param numberOfFrames The number of frames to use for initialization.
      */
-    void initializeModel(int numberOfFrames);
+    void initializeModel();
 
     /**
      * Process the next frame and return the foreground mask.
      * @return The foreground mask.
      */
-    tuple<Mat, Mat, Mat> processNextFrame();
+    std::vector<cv::Mat> processNextFrame();
+
+    std::vector<double> getPixelEtas(int row, int col) const
+    {
+        return mixtures[row * cols + col].getEtas();
+    };
+
+    std::vector<Gaussian> getPixelGaussians(int row, int col) const
+    {
+        return mixtures[row * cols + col].getGaussians();
+    };
+
+    unsigned int getRows() const { return rows; };
+
+    unsigned int getCols() const { return cols; };
+
+    unsigned int getFPS() const { return fps; };
 };
 
 #endif
